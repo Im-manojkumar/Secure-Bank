@@ -1,0 +1,119 @@
+{
+  "validation": {
+    "Logistic Regression": {
+      "threshold": 1.0,
+      "precision": 0.8734,
+      "recall": 0.734,
+      "f1": 0.7977,
+      "pr_auc": 0.69,
+      "roc_auc": 0.9722,
+      "confusion_matrix": {
+        "tn": 56641,
+        "fp": 10,
+        "fn": 25,
+        "tp": 69
+      }
+    },
+    "Decision Tree": {
+      "threshold": 0.999264,
+      "precision": 0.6087,
+      "recall": 0.7447,
+      "f1": 0.6699,
+      "pr_auc": 0.4654,
+      "roc_auc": 0.8859,
+      "confusion_matrix": {
+        "tn": 56606,
+        "fp": 45,
+        "fn": 24,
+        "tp": 70
+      }
+    },
+    "Random Forest": {
+      "threshold": 0.815372,
+      "precision": 0.9067,
+      "recall": 0.7234,
+      "f1": 0.8047,
+      "pr_auc": 0.7795,
+      "roc_auc": 0.966,
+      "confusion_matrix": {
+        "tn": 56644,
+        "fp": 7,
+        "fn": 26,
+        "tp": 68
+      }
+    },
+    "SVM (linear)": {
+      "threshold": 1.91063,
+      "precision": 0.7634,
+      "recall": 0.7553,
+      "f1": 0.7594,
+      "pr_auc": 0.637,
+      "roc_auc": 0.9716,
+      "confusion_matrix": {
+        "tn": 56629,
+        "fp": 22,
+        "fn": 23,
+        "tp": 71
+      }
+    }
+  },
+  "test": {
+    "Logistic Regression": {
+      "threshold": 1.0,
+      "precision": 0.8875,
+      "recall": 0.7474,
+      "f1": 0.8114,
+      "pr_auc": 0.7342,
+      "roc_auc": 0.968,
+      "confusion_matrix": {
+        "tn": 56642,
+        "fp": 9,
+        "fn": 24,
+        "tp": 71
+      }
+    },
+    "Decision Tree": {
+      "threshold": 0.999264,
+      "precision": 0.6017,
+      "recall": 0.7474,
+      "f1": 0.6667,
+      "pr_auc": 0.4757,
+      "roc_auc": 0.9272,
+      "confusion_matrix": {
+        "tn": 56604,
+        "fp": 47,
+        "fn": 24,
+        "tp": 71
+      }
+    },
+    "Random Forest": {
+      "threshold": 0.815372,
+      "precision": 0.8846,
+      "recall": 0.7263,
+      "f1": 0.7977,
+      "pr_auc": 0.7875,
+      "roc_auc": 0.9866,
+      "confusion_matrix": {
+        "tn": 56642,
+        "fp": 9,
+        "fn": 26,
+        "tp": 69
+      }
+    },
+    "SVM (linear)": {
+      "threshold": 1.91063,
+      "precision": 0.7553,
+      "recall": 0.7474,
+      "f1": 0.7513,
+      "pr_auc": 0.7069,
+      "roc_auc": 0.9704,
+      "confusion_matrix": {
+        "tn": 56628,
+        "fp": 23,
+        "fn": 24,
+        "tp": 71
+      }
+    }
+  },
+  "best_model": "Random Forest"
+}
