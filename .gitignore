@@ -1,11 +1,11 @@
-# Datasets stay local: creditcard.csv is ~150 MB and real transaction data must never be committed.
+# Datasets stay local: the CSVs are 150 to 500 MB and real transaction data must never be committed.
 data/raw/*
 data/processed/*
 !data/raw/.gitkeep
 !data/processed/.gitkeep
 
 # Trained model files are rebuilt with `python -m ml.train`; reports are kept.
-ml/artifacts/*.joblib
+ml/artifacts/**/*.joblib
 
 # Local database and secrets
 instance/

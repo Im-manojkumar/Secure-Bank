@@ -35,7 +35,7 @@
         body.replaceChildren(...data.items.map((t) => SB.linkRow(`/transactions/${t.id}`, [
           SB.el("td", {}, t.id),
           SB.el("td", {}, SB.dateTime(t.timestamp)),
-          SB.el("td", { class: "num" }, SB.money(t.amount)),
+          SB.el("td", { class: "num" }, SB.money(t.amount, t.currency)),
           SB.el("td", {}, SB.predictionBadge(t.prediction)),
           SB.el("td", { class: "num" }, SB.score(t.prediction && t.prediction.risk_score)),
           SB.el("td", {}, t.case ? SB.statusBadge(t.case.status) : "–"),

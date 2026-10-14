@@ -14,11 +14,13 @@
     const t = c.transaction;
     $("case-transaction").replaceChildren(
       SB.el("dt", {}, "Transaction"), SB.el("dd", {}, `#${t.id}`),
-      SB.el("dt", {}, "Amount"), SB.el("dd", {}, SB.money(t.amount)),
+      SB.el("dt", {}, "Data"), SB.el("dd", {}, SB.datasetName(t.dataset)),
+      SB.el("dt", {}, "Amount"), SB.el("dd", {}, SB.money(t.amount, t.currency)),
       SB.el("dt", {}, "Time"), SB.el("dd", {}, SB.dateTime(t.timestamp)),
       SB.el("dt", {}, "Risk score"), SB.el("dd", {}, SB.score(t.risk_score)),
       SB.el("dt", {}, "Outcome"), SB.el("dd", {}, SB.outcomeText(c.outcome)),
     );
+    $("case-reasons").replaceChildren(SB.el("h3", {}, "Why it was flagged"), SB.reasons(t.explanation));
     $("case-tx-link").href = `/transactions/${t.id}`;
     form.status.value = c.status;
     form.outcome.value = c.outcome || "";

@@ -1,6 +1,6 @@
 # SecureBank architecture
 
-SecureBank is a single Flask application with a SQLite database and a scikit-learn model saved to disk. A browser loads HTML pages from Flask, and each page's JavaScript calls the app's JSON API.
+SecureBank is a single Flask application with a SQLite database and scikit-learn models saved to disk, one per data format. A browser loads HTML pages from Flask, and each page's JavaScript calls the app's JSON API.
 
 ## Components
 
@@ -13,13 +13,13 @@ flowchart LR
     subgraph Flask app
         R[Routes<br/>routes/*.py]
         S[Services<br/>ingestion, prediction,<br/>alerts, audit]
-        M[Saved model<br/>ml/artifacts/model.joblib]
+        M[Saved models, one per format<br/>ml/artifacts/&lt;dataset&gt;/model.joblib]
     end
 
     D[(SQLite<br/>instance/securebank.db)]
     CSV[CSV file<br/>upload or CLI]
     T[Training script<br/>python -m ml.train]
-    K[(creditcard.csv)]
+    K[(creditcard.csv<br/>fraudTrain/Test.csv<br/>paysim.csv)]
 
     P -- "fetch /api/... (session cookie)" --> R
     R --> S
@@ -34,7 +34,7 @@ flowchart LR
 | Pages | `templates/`, `static/js/`, `static/css/` | Show data and forms. They hold no business logic and only call the API. |
 | Routes | `routes/*.py` | Check login and role, validate input, and return JSON or HTML. |
 | Services | `services/*.py` | Import, scoring, case rules and audit logging, kept out of the routes so they can be tested and reused by the CLI. |
-| Model | `ml/*.py`, `ml/artifacts/` | Training, evaluation and a `FraudModel` class that loads the saved pipeline. |
+| Model | `ml/*.py`, `ml/artifacts/` | Data formats (`datasets.py`), training, evaluation, explanations, and a `FraudModel` class that loads a saved pipeline. |
 | Data | `models.py`, `instance/securebank.db` | Six tables, described below. |
 
 ## What happens when a file is imported
@@ -51,9 +51,10 @@ sequenceDiagram
     Admin->>Page: choose creditcard.csv
     Page->>API: upload (multipart)
     API->>Ingest: import_transactions(file)
-    Ingest->>Ingest: check columns, drop bad rows,<br/>hash rows to find duplicates
+    Ingest->>Ingest: recognise the format from the columns,<br/>drop bad rows, hash rows to find duplicates
     Ingest->>DB: which hashes already exist?
-    Ingest->>Model: score all new rows at once
+    Ingest->>Model: score all new rows with that format's model
+    Ingest->>Model: explain the flagged rows
     Ingest->>DB: insert transactions, predictions,<br/>and an Open case per flagged row
     Ingest->>DB: data_sources row + audit_logs row
     API-->>Page: rows imported, skipped, flagged
@@ -79,6 +80,7 @@ erDiagram
     data_sources {
         int id
         string name
+        string dataset
         string status
         int rows_imported
         int rows_skipped
@@ -98,6 +100,7 @@ erDiagram
         string model_version
         int predicted_label
         float risk_score
+        json explanation
     }
     fraud_cases {
         int id
@@ -119,14 +122,29 @@ erDiagram
 
 The imported record, the model's prediction and the analyst's outcome sit in three separate tables. A reviewer marking a case "Legitimate" never changes what the model predicted, so the two can be compared later. `dataset_label` keeps the Kaggle `Class` value for evaluation only, and the app never uses it to make decisions.
 
-## The model
+## The models
 
-- **Data:** the Kaggle credit-card dataset, with 284,807 transactions and 492 frauds. 1,081 duplicate rows are dropped.
-- **Split:** 60% train, 20% validation and 20% test, stratified so each part keeps the 0.17% fraud rate.
+Each dataset format has its own model, because the formats share no columns. `ml/datasets.py` describes each format: its required columns, how rows are cleaned, which columns are stored, and how the model inputs are built.
+
+| Format | Data | Split | Model inputs | Saved model | Test PR-AUC | Precision | Recall |
+|---|---|---|---|---|---|---|---|
+| `creditcard` | 284,807 card payments, 492 frauds; 1,081 duplicates dropped | 60/20/20, stratified | `Time`, `V1` to `V28`, `Amount` | Gradient Boosting, threshold 0.935 | 0.858 | 0.925 | 0.779 |
+| `sparkov` | 1,852,394 simulated US card payments, 9,651 frauds | `fraudTrain.csv` 75/25 into train and validation; `fraudTest.csv`, six months later, is the test set | amount, hour, night-time, day of week, age, city population, customer-to-merchant distance, merchant category | Gradient Boosting, threshold 0.922 | 0.869 | 0.849 | 0.767 |
+| `paysim` | 6,362,620 simulated mobile-money transfers, 8,213 frauds; 543 duplicates dropped | 60/20/20, stratified; training cut to 1 million rows, keeping every fraud | type, amount, the four balances, account emptied, balance mismatches, hour | Random Forest, threshold 0.756 | 0.999 | 1.000 | 0.998 |
+
 - **Pipeline:** `StandardScaler`, then `SMOTE`, then the classifier. SMOTE runs only while fitting, so validation and test rows are never resampled.
-- **Candidates:** Logistic Regression, Decision Tree, Random Forest and a linear SVM.
+- **Candidates:** Logistic Regression, Decision Tree, Random Forest, a linear SVM and Gradient Boosting (`HistGradientBoostingClassifier`).
 - **Selection:** the highest PR-AUC on the validation set picks the model. Its alert threshold is the one that gives the best F1 on the validation set. The test set is scored once, at the end.
-- **Result:** Random Forest, with test PR-AUC 0.788, precision 0.885 and recall 0.726 at threshold 0.815.
+- **Gradient Boosting needs regularisation.** Without an L2 penalty on its leaves, it fell apart on PaySim (validation PR-AUC 0.02), because leaves holding only SMOTE-made fraud rows got extreme values. With `l2_regularization=1.0` it reached 0.997.
+- **Fairness:** Sparkov includes each customer's gender. It is neither stored nor used, so the model cannot score men and women differently. An earlier version used it, and it showed up as a reason for some alerts. Names, street, job, ZIP code and the full card number are also never stored.
+- **PaySim's caveat:** its near-perfect score comes from the simulator. Its fraudulent transfers almost always empty the account and leave balances that do not add up, which makes them easy to spot. Real data would not be this clean, so the Sparkov result is the better guide to real-world performance.
+- **Step 1's model:** Random Forest on the credit card data, with test PR-AUC 0.787. Gradient Boosting now catches 74 of the 95 test frauds instead of 69, with 6 false alerts instead of 9.
+
+### Why a transaction was flagged
+
+`ml/explain.py` explains each flagged transaction by occlusion. Inputs are grouped (for example, all merchant category columns form one group). For each group, the transaction's values are replaced by those of a typical genuine transaction (the training median, or the most common category) and the transaction is scored again. The drop in score is that group's effect. The three groups with the biggest effects, of at least 0.001, are stored with the prediction as `[{feature, value, typical, effect}]`.
+
+This works the same for every model type, and the typical values are saved in `model_meta.json`, so explanations need no training data at run time. Effects are not additive and ignore interactions between groups, so they say which inputs mattered most, not exactly how much each one contributed.
 
 ## Security
 

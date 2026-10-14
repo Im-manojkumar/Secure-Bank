@@ -4,7 +4,7 @@
 <div class="page-head">
   <div>
     <h1>Check a transaction</h1>
-    <p class="lede">Enter a transaction's values and the model scores it. Nothing is saved.</p>
+    <p class="lede">Enter a transaction's values and the model for its data format scores it. Nothing is saved.</p>
   </div>
 </div>
 
@@ -27,7 +27,12 @@
 
 <form class="card" id="predict-form">
   <h2>Transaction values</h2>
-  <div class="features" id="inputs"></div>
+  <div class="field">
+    <label for="dataset">Data format</label>
+    <select id="dataset" name="dataset" class="input-medium"></select>
+    <span class="field-help" id="dataset-help"></span>
+  </div>
+  <div class="features features-wide" id="inputs"></div>
   <p id="predict-error" role="alert" hidden></p>
   <div class="actions mt-16">
     <button class="btn btn-primary" type="submit">Check</button>

@@ -1,0 +1,56 @@
+{
+  "dataset": "paysim",
+  "dataset_title": "PaySim mobile money",
+  "model_name": "Random Forest",
+  "threshold": 0.755886,
+  "score_type": "probability",
+  "features": [
+    "amount",
+    "log_amount",
+    "type_CASH_IN",
+    "type_CASH_OUT",
+    "type_DEBIT",
+    "type_PAYMENT",
+    "type_TRANSFER",
+    "oldbalanceOrg",
+    "newbalanceOrig",
+    "empties_account",
+    "oldbalanceDest",
+    "newbalanceDest",
+    "orig_balance_error",
+    "dest_balance_error",
+    "hour"
+  ],
+  "smote": true,
+  "trained_at": "2026-10-14T16:56:52+00:00",
+  "rows": {
+    "train": 3817246,
+    "validation": 1272415,
+    "test": 1272416,
+    "train_used": 1000000
+  },
+  "selection": "highest validation PR-AUC; threshold maximises validation F1",
+  "test_metrics": {
+    "precision": 1.0,
+    "recall": 0.9976,
+    "f1": 0.9988,
+    "pr_auc": 0.9992
+  },
+  "baseline": {
+    "amount": 74589.11,
+    "log_amount": 11.21976320366499,
+    "type_CASH_IN": 0.0,
+    "type_CASH_OUT": 1.0,
+    "type_DEBIT": 0.0,
+    "type_PAYMENT": 0.0,
+    "type_TRANSFER": 0.0,
+    "oldbalanceOrg": 14034.0,
+    "newbalanceOrig": 0.0,
+    "empties_account": 0.0,
+    "oldbalanceDest": 133088.08,
+    "newbalanceDest": 214348.22,
+    "orig_balance_error": -68900.37000000014,
+    "dest_balance_error": 3502.33,
+    "hour": 16.0
+  }
+}

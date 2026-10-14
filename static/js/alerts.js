@@ -24,7 +24,7 @@
           SB.el("td", {}, `#${c.id}`),
           SB.el("td", {}, SB.statusBadge(c.status)),
           SB.el("td", {}, SB.dateTime(c.transaction.timestamp)),
-          SB.el("td", { class: "num" }, SB.money(c.transaction.amount)),
+          SB.el("td", { class: "num" }, SB.money(c.transaction.amount, c.transaction.currency)),
           SB.el("td", { class: "num" }, SB.score(c.transaction.risk_score)),
           SB.el("td", {}, SB.outcomeText(c.outcome)),
           SB.el("td", {}, c.reviewed_by || "–"),

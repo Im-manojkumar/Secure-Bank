@@ -76,7 +76,26 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | WS-04 | Every page | No inline scripts or styles that the CSP would block | `test_pages_have_no_inline_scripts_or_styles` |
 | WS-05 | Unknown page or API route | HTML 404 page, or JSON error | `test_unknown_page_shows_html_404`, `test_api_errors_are_json` |
 
-## 7. Manual checks in a browser
+## 7. More datasets and explanations (`tests/test_datasets.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| DS-01 | Kaggle, Sparkov and PaySim files | Each format recognised from its columns | `test_formats_are_recognised_from_their_columns` |
+| DS-02 | Sparkov rows with a negative amount, unknown category, bad date or label 3 | Those rows dropped; names, street, job, ZIP, gender and full card number never kept; card reduced to its last 4 digits | `test_sparkov_cleaning_drops_bad_rows_and_personal_data` |
+| DS-03 | Sparkov model inputs | Hour 0 to 23, positive age, distance of 0 or more, exactly one merchant category per row | `test_sparkov_features_are_readable` |
+| DS-04 | PaySim transfer that empties the sender's account | Inputs mark the emptied account, the receiver mismatch and the hour | `test_paysim_features_include_balance_mismatches` |
+| DS-05 | Training per format | Each format has its own model, with a typical genuine row saved for explanations | `test_each_format_trains_its_own_model` |
+| DS-06 | Explaining flagged fake Sparkov fraud (large late-night online buys) | Amount, time of day or category lead the reasons; at most 3 reasons, each with value, typical value and effect | `test_explanations_name_the_planted_pattern` |
+| DS-07 | Import a Sparkov file and a PaySim file | Scored by the matching model, right currency (USD, none), reasons stored for suspicious rows, re-import adds nothing | `test_import_scores_each_format_with_its_model` |
+| DS-08 | Low-risk rows | No explanation stored | `test_low_risk_rows_store_no_explanation` |
+| DS-09 | File matching no format, or Sparkov missing `dob` | 400; the message names the closest format and the missing column | `test_import_rejects_unknown_format`, `test_import_names_missing_columns_of_the_closest_format` |
+| DS-10 | Import when the format has no trained model | 503 naming the training command | `test_import_without_a_trained_model_is_refused` |
+| DS-11 | `GET /api/models` | All three formats, their form fields and options, and each trained model's threshold | `test_models_endpoint_lists_formats_and_models` |
+| DS-12 | Check a Sparkov transaction | Result plus the reasons for its score | `test_predict_with_a_dataset_explains_the_score` |
+| DS-13 | Check with bad values in each format | 400 listing each problem; unknown format refused | `test_predict_validates_each_format`, `test_transaction_filter_rejects_unknown_dataset` |
+| DS-14 | Dashboard with euro and dollar imports | Flagged amounts totalled per currency, never mixed | `test_dashboard_totals_flagged_amounts_per_currency` |
+
+## 8. Manual checks in a browser
 
 These were run in Chromium against the full Kaggle dataset (283,726 transactions).
 

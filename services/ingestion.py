@@ -1,17 +1,16 @@
 """Import transaction CSV files: validate, de-duplicate, score and store.
 
-Each import creates a DataSource row recording what happened. Rows the
-model flags as suspicious get an Open fraud case for review.
+The file's format is recognised from its columns (see ml/datasets.py), and
+the model trained on that format scores it. Each import creates a
+DataSource row recording what happened. Rows the model flags as suspicious
+get an Open fraud case for review, with the inputs that raised their score.
 """
 
-from datetime import timedelta
-
-import numpy as np
 import pandas as pd
 from flask import current_app
 from sqlalchemy import insert, select
 
-from ml.preprocess import FEATURES, TARGET
+from ml.datasets import LABEL, PROFILES, detect_profile
 from models import DataSource, FraudCase, Prediction, Transaction, db, utcnow
 from services import audit
 from services.prediction import get_model, model_version
@@ -24,35 +23,30 @@ class CSVImportError(ValueError):
 
 
 def read_and_validate(file_obj):
-    """Read a CSV and return (clean DataFrame, rows received, rows skipped as invalid)."""
+    """Read a CSV. Returns (profile, clean DataFrame, rows received, rows skipped as invalid)."""
     try:
         df = pd.read_csv(file_obj)
     except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as exc:
         raise CSVImportError(f"Could not read the file as CSV: {exc}") from exc
 
-    missing = [c for c in FEATURES if c not in df.columns]
+    profile, missing = detect_profile(df.columns)
+    if len(missing) > len(profile.required_columns) / 2:
+        titles = ", ".join(p.title for p in PROFILES.values())
+        raise CSVImportError(f"The columns do not match any supported format ({titles}).")
     if missing:
-        raise CSVImportError(f"Missing required columns: {', '.join(missing)}")
+        raise CSVImportError(f"Missing required columns for the {profile.title} format: {', '.join(missing)}")
 
     received = len(df)
     if received == 0:
         raise CSVImportError("The file has no rows")
 
-    columns = FEATURES + ([TARGET] if TARGET in df.columns else [])
-    # Always float64, so the same values hash the same whichever way pandas read them.
-    df = df[columns].apply(pd.to_numeric, errors="coerce").astype(float)
-
-    valid = np.isfinite(df[FEATURES]).all(axis=1) & (df["Amount"] >= 0)
-    if TARGET in df.columns:
-        # A label is optional per row, but when present it must be 0 or 1.
-        valid &= df[TARGET].isna() | df[TARGET].isin([0, 1])
-    df = df[valid]
-    return df, received, received - len(df)
+    clean, invalid = profile.clean(df)
+    return profile, clean, received, invalid
 
 
-def row_hashes(df):
-    """A fingerprint of each row's feature values, as 16-character hex strings."""
-    return pd.util.hash_pandas_object(df[FEATURES], index=False).map(lambda h: f"{h:016x}")
+def row_hashes(df, columns):
+    """A fingerprint of each row's stored values, as 16-character hex strings."""
+    return pd.util.hash_pandas_object(df[columns], index=False).map(lambda h: f"{h:016x}")
 
 
 def existing_hashes(hashes):
@@ -67,23 +61,22 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
     """Import a CSV file object. Returns the DataSource row describing the result.
 
     Raises CSVImportError for files that cannot be imported, and ModelNotReady
-    if no trained model exists yet.
+    if no model has been trained for the file's format yet.
     """
-    model = get_model()
+    profile, df, received, invalid = read_and_validate(file_obj)
+    model = get_model(profile.key)
     version = model_version(model)
-    start_time = current_app.config["DATASET_START"]
-
-    df, received, invalid = read_and_validate(file_obj)
+    stored = profile.stored_columns(df)
 
     # Remember the original row numbers (1 = first data row) before filtering further.
-    df = df.assign(_row=df.index + 1, _hash=row_hashes(df))
+    df = df.assign(_row=df.index + 1, _hash=row_hashes(df, stored))
     df = df.drop_duplicates("_hash")
     already = existing_hashes(df["_hash"].tolist())
-    df = df[~df["_hash"].isin(already)]
+    df = df[~df["_hash"].isin(already)].reset_index(drop=True)
     duplicates = received - invalid - len(df)
 
     source = DataSource(
-        name=name, source_type=source_type, rows_received=received,
+        name=name, source_type=source_type, dataset=profile.key, rows_received=received,
         imported_by=user.id if user else None,
     )
     db.session.add(source)
@@ -93,15 +86,18 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
     if len(df):
         scores, flagged = model.score(df)
         flagged_count = int(flagged.sum())
-        has_label = TARGET in df.columns
+        explanations = [None] * len(df)
+        for i, reasons in zip(flagged.nonzero()[0], model.explain(df[flagged])):
+            explanations[i] = reasons
         now = utcnow()
 
-        records = df[FEATURES].to_dict("records")
-        amounts = df["Amount"].to_numpy(dtype=float)
-        times = df["Time"].to_numpy(dtype=float)
+        records = df[stored].to_dict("records")
+        amounts = profile.amounts(df)
+        times = profile.timestamps(df, current_app.config)
+        types = profile.transaction_types(df)
         row_numbers = df["_row"].to_numpy()
         hashes = df["_hash"].to_numpy()
-        labels = df[TARGET].to_numpy() if has_label else [None] * len(df)
+        labels = df[LABEL].to_numpy() if LABEL in df.columns else [None] * len(df)
 
         for start in range(0, len(df), CHUNK_SIZE):
             end = start + CHUNK_SIZE
@@ -109,8 +105,8 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
                 {
                     "source_id": source.id,
                     "amount": float(amounts[i]),
-                    "timestamp": start_time + timedelta(seconds=float(times[i])),
-                    "transaction_type": "card",
+                    "timestamp": times[i],
+                    "transaction_type": types[i],
                     "raw_data_reference": f"{name}#row{int(row_numbers[i])}",
                     "features": records[i],
                     "dataset_label": None if labels[i] is None or pd.isna(labels[i]) else int(labels[i]),
@@ -127,15 +123,16 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
                 {
                     "transaction_id": tid,
                     "model_version": version,
-                    "predicted_label": int(flag),
-                    "risk_score": float(score),
+                    "predicted_label": int(flagged[i]),
+                    "risk_score": float(scores[i]),
+                    "explanation": explanations[i],
                     "created_at": now,
                 }
-                for tid, score, flag in zip(ids, scores[start:end], flagged[start:end])
+                for tid, i in zip(ids, range(start, end))
             ])
             cases = [
                 {"transaction_id": tid, "status": "Open", "review_notes": "", "created_at": now, "updated_at": now}
-                for tid, flag in zip(ids, flagged[start:end]) if flag
+                for tid, i in zip(ids, range(start, end)) if flagged[i]
             ]
             if cases:
                 db.session.execute(insert(FraudCase), cases)
@@ -144,12 +141,12 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
     source.rows_skipped = invalid + duplicates
     source.status = "completed"
     source.message = (
-        f"Imported {len(df):,} of {received:,} rows; skipped {invalid:,} invalid and "
+        f"Imported {len(df):,} of {received:,} rows as {profile.title}; skipped {invalid:,} invalid and "
         f"{duplicates:,} duplicate rows. Flagged {flagged_count:,} as suspicious."
     )
     audit.record("import_completed", user=user, subject=f"source:{source.id}", details={
-        "file": name, "rows_imported": source.rows_imported, "rows_skipped": source.rows_skipped,
-        "flagged": flagged_count,
+        "file": name, "dataset": profile.key, "rows_imported": source.rows_imported,
+        "rows_skipped": source.rows_skipped, "flagged": flagged_count,
     })
     db.session.commit()
     return source
