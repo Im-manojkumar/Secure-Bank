@@ -4,7 +4,7 @@
 <p><a href="{{ url_for('pages.alerts') }}">← All alerts</a></p>
 <div class="page-head">
   <div>
-    <h1>Case #{{ case_id }} <span id="case-status"></span></h1>
+    <h1 id="page-title" data-id="{{ case_id }}">Case #{{ case_id }} <span id="case-status"></span></h1>
     <p class="lede" id="case-sub">&nbsp;</p>
   </div>
 </div>
@@ -14,7 +14,7 @@
   <div class="card">
     <h2>Flagged transaction</h2>
     <dl class="dl" id="case-transaction"></dl>
-    <p style="margin-top:12px"><a id="case-tx-link" href="#">See all transaction details →</a></p>
+    <p class="mt-12"><a id="case-tx-link" href="#">See all transaction details →</a></p>
   </div>
 
   <form class="card" id="review-form">
@@ -48,6 +48,5 @@
 </section>
 {% endblock %}
 {% block scripts %}
-<script>window.CASE_ID = {{ case_id|tojson }};</script>
 <script src="{{ url_for('static', filename='js/case.js') }}"></script>
 {% endblock %}

@@ -1,7 +1,8 @@
 (async function () {
   const $ = (id) => document.getElementById(id);
+  const PAGE_ID = $("page-title").dataset.id;
   try {
-    const { transaction: t } = await SB.api(`/api/transactions/${window.TRANSACTION_ID}`);
+    const { transaction: t } = await SB.api(`/api/transactions/${PAGE_ID}`);
     $("tx-sub").textContent = `${SB.money(t.amount)} on ${SB.dateTime(t.timestamp)}`;
 
     $("tx-details").replaceChildren(
@@ -19,7 +20,7 @@
     $("tx-prediction").replaceChildren(p
       ? SB.el("div", {},
           SB.predictionBadge(p),
-          SB.el("dl", { class: "dl", style: "margin-top:12px" },
+          SB.el("dl", { class: "dl mt-12" },
             SB.el("dt", {}, "Risk score"), SB.el("dd", {}, SB.score(p.risk_score)),
             SB.el("dt", {}, "Model"), SB.el("dd", {}, p.model_version),
             SB.el("dt", {}, "Scored"), SB.el("dd", {}, SB.dateTime(p.created_at))),

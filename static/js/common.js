@@ -33,6 +33,8 @@ SB.el = function (tag, attrs = {}, ...children) {
   for (const [key, value] of Object.entries(attrs)) {
     if (value === null || value === undefined || value === false) continue;
     if (key === "class") node.className = value;
+    // CSSOM, not a style attribute: the Content-Security-Policy blocks inline style attributes.
+    else if (key === "style") node.style.cssText = value;
     else if (key === "dataset") Object.assign(node.dataset, value);
     else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
     else node.setAttribute(key, value === true ? "" : value);

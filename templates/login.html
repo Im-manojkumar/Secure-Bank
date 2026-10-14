@@ -2,7 +2,7 @@
 {% block title %}Log in{% endblock %}
 {% block content %}
 <div class="login-wrap">
-  <form class="card login-card" id="login-form" novalidate>
+  <form class="card login-card" id="login-form" data-next="{{ next_url }}" novalidate>
     <div class="brand">
       <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="currentColor"/></svg>
       SecureBank
@@ -18,25 +18,10 @@
       <input id="password" name="password" type="password" autocomplete="current-password" required>
     </div>
     <p id="login-error" role="alert" hidden></p>
-    <button class="btn btn-primary" type="submit" style="width:100%">Log in</button>
+    <button class="btn btn-primary w-full" type="submit">Log in</button>
   </form>
 </div>
 {% endblock %}
 {% block scripts %}
-<script>
-  const form = document.getElementById("login-form");
-  const errorBox = document.getElementById("login-error");
-  form.addEventListener("submit", async (event) => {
-    event.preventDefault();
-    const button = form.querySelector("button");
-    button.disabled = true;
-    try {
-      await SB.api("/api/auth/login", { method: "POST", json: { email: form.email.value, password: form.password.value } });
-      window.location.href = {{ next_url|tojson }};
-    } catch (error) {
-      SB.message(errorBox, error.message);
-      button.disabled = false;
-    }
-  });
-</script>
+<script src="{{ url_for('static', filename='js/login.js') }}"></script>
 {% endblock %}

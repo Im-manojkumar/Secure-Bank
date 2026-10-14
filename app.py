@@ -10,6 +10,7 @@ Run locally:
 import secrets
 import warnings
 from pathlib import Path
+from urllib.parse import urlparse
 
 import click
 from flask import Flask, jsonify, redirect, render_template, request, url_for
@@ -18,6 +19,7 @@ from werkzeug.exceptions import HTTPException
 
 from config import Config
 from models import ROLES, User, db
+from services import audit
 
 login_manager = LoginManager()
 
@@ -37,12 +39,13 @@ def create_app(config_class=Config):
     db.init_app(app)
     login_manager.init_app(app)
 
-    from routes import alerts, auth, dashboard, pages, transactions
+    from routes import alerts, audit as audit_routes, auth, dashboard, pages, transactions
 
-    for module in (auth, transactions, alerts, dashboard, pages):
+    for module in (auth, transactions, alerts, dashboard, audit_routes, pages):
         app.register_blueprint(module.bp)
 
     register_error_handlers(app)
+    register_security(app)
     register_commands(app)
 
     @app.get("/api/health")
@@ -63,6 +66,43 @@ def unauthorized():
     if request.path.startswith("/api/"):
         return jsonify(error="Please log in first."), 401
     return redirect(url_for("pages.login", next=request.full_path.rstrip("?")))
+
+
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; "
+    "connect-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+)
+
+
+def register_security(app):
+    @app.before_request
+    def reject_cross_site_writes():
+        """Block state-changing API calls sent from another website (CSRF).
+
+        Browsers send an Origin header on POST/PATCH/DELETE. If it names a different
+        site, the request did not come from SecureBank's own pages. SameSite=Lax
+        cookies already stop most of these; this check covers the rest.
+        """
+        if request.method in ("GET", "HEAD", "OPTIONS") or not request.path.startswith("/api/"):
+            return None
+        origin = request.headers.get("Origin")
+        if origin is None:
+            # Non-browser clients such as curl and the test client send no Origin.
+            return None
+        if urlparse(origin).netloc != request.host:
+            return jsonify(error="Cross-site request blocked."), 403
+        return None
+
+    @app.after_request
+    def security_headers(response):
+        response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        if request.path.startswith("/api/"):
+            # API responses can contain transaction data: never cache them.
+            response.headers.setdefault("Cache-Control", "no-store")
+        return response
 
 
 def register_error_handlers(app):
@@ -103,6 +143,8 @@ def register_commands(app):
         user = User(email=email, role=role)
         user.set_password(password)
         db.session.add(user)
+        db.session.flush()
+        audit.record("user_created", subject=email, details={"role": role, "via": "cli"})
         db.session.commit()
         click.echo(f"Created {role} {email}")
 

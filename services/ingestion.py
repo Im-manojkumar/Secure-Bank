@@ -13,6 +13,7 @@ from sqlalchemy import insert, select
 
 from ml.preprocess import FEATURES, TARGET
 from models import DataSource, FraudCase, Prediction, Transaction, db, utcnow
+from services import audit
 from services.prediction import get_model, model_version
 
 CHUNK_SIZE = 5000
@@ -146,6 +147,10 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
         f"Imported {len(df):,} of {received:,} rows; skipped {invalid:,} invalid and "
         f"{duplicates:,} duplicate rows. Flagged {flagged_count:,} as suspicious."
     )
+    audit.record("import_completed", user=user, subject=f"source:{source.id}", details={
+        "file": name, "rows_imported": source.rows_imported, "rows_skipped": source.rows_skipped,
+        "flagged": flagged_count,
+    })
     db.session.commit()
     return source
 
@@ -156,5 +161,7 @@ def record_failed_import(name, message, user=None, source_type="csv_upload"):
         imported_by=user.id if user else None,
     )
     db.session.add(source)
+    db.session.flush()
+    audit.record("import_failed", user=user, subject=f"source:{source.id}", details={"file": name, "error": message})
     db.session.commit()
     return source

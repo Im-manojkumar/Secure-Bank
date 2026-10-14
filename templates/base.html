@@ -21,6 +21,7 @@
       <a href="{{ url_for('pages.predict') }}" {% if active == 'predict' %}aria-current="page"{% endif %}>Check a transaction</a>
       {% if current_user.is_admin %}
       <a href="{{ url_for('pages.import_page') }}" {% if active == 'import' %}aria-current="page"{% endif %}>Import</a>
+      <a href="{{ url_for('pages.audit_page') }}" {% if active == 'audit' %}aria-current="page"{% endif %}>Audit log</a>
       {% endif %}
     </nav>
     <div class="user">

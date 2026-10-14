@@ -70,3 +70,11 @@ def import_page():
     if not current_user.is_admin:
         abort(403)
     return render_template("import.html", active="import")
+
+
+@bp.get("/audit")
+@login_required
+def audit_page():
+    if not current_user.is_admin:
+        abort(403)
+    return render_template("audit.html", active="audit")

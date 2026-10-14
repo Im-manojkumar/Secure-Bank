@@ -4,7 +4,7 @@
 <p><a href="{{ url_for('pages.transactions') }}">← All transactions</a></p>
 <div class="page-head">
   <div>
-    <h1>Transaction #{{ transaction_id }}</h1>
+    <h1 id="page-title" data-id="{{ transaction_id }}">Transaction #{{ transaction_id }}</h1>
     <p class="lede" id="tx-sub">&nbsp;</p>
   </div>
   <div class="actions" id="tx-actions"></div>
@@ -29,6 +29,5 @@
 </div>
 {% endblock %}
 {% block scripts %}
-<script>window.TRANSACTION_ID = {{ transaction_id|tojson }};</script>
 <script src="{{ url_for('static', filename='js/transaction_detail.js') }}"></script>
 {% endblock %}
