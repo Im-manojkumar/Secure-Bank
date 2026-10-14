@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Reports{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Saved reports</h1>
+    <p class="lede">Searches saved by the team. Each report is run again when you open it, so it always shows the current data.</p>
+  </div>
+  <div class="actions"><a class="btn" href="{{ url_for('pages.transactions') }}">New search</a></div>
+</div>
+<p id="reports-error" role="alert" hidden></p>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Report</th><th>Filters</th><th>Saved by</th><th>Saved</th></tr></thead>
+      <tbody id="reports-body"><tr><td colspan="4" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+<p class="muted">To save a report, search on the <a href="{{ url_for('pages.transactions') }}">Transactions</a> page and give the search a name.</p>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/reports.js') }}"></script>
+{% endblock %}

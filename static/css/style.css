@@ -222,3 +222,12 @@ td.wrap { white-space: normal; min-width: 260px; }
   .user-email { display: none; }
   .status-row { grid-template-columns: 100px 1fr 50px; }
 }
+
+/* Saved reports */
+.save-bar { display: flex; gap: 12px; align-items: end; flex-wrap: wrap; justify-content: space-between; margin-bottom: 16px; }
+.save-form { display: flex; gap: 8px; align-items: end; flex: 1 1 320px; max-width: 560px; }
+.save-form .grow { flex: 1; }
+.save-form input { width: 100%; }
+.report-filters { color: var(--text-2); margin: 4px 0 0; }
+.report-body { grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); margin-bottom: 16px; }
+@media (max-width: 800px) { .report-body { grid-template-columns: minmax(0, 1fr); } }

@@ -78,6 +78,47 @@ SB.outcomeText = (outcome) => outcome || "–";
 SB.DATASETS = { creditcard: "Kaggle credit card", sparkov: "Sparkov card payments", paysim: "PaySim mobile money" };
 SB.datasetName = (key) => SB.DATASETS[key] || key || "–";
 
+// A search's filters in words, e.g. "Sparkov card payments · Suspicious · Amount from 500".
+SB.describeFilters = function (filters) {
+  const f = filters || {};
+  const day = (v) => SB.dateTime(v.length === 10 ? `${v}T00:00:00` : v);
+  const parts = [];
+  if (f.dataset) parts.push(SB.datasetName(f.dataset));
+  if (f.prediction) parts.push(f.prediction === "suspicious" ? "Suspicious" : "Low risk");
+  if (f.status) parts.push(`Case ${f.status.toLowerCase()}`);
+  if (f.min_amount && f.max_amount) parts.push(`Amount ${f.min_amount} to ${f.max_amount}`);
+  else if (f.min_amount) parts.push(`Amount from ${f.min_amount}`);
+  else if (f.max_amount) parts.push(`Amount up to ${f.max_amount}`);
+  if (f.date_from) parts.push(`From ${day(f.date_from)}`);
+  if (f.date_to) parts.push(`Until ${day(f.date_to)}`);
+  if (f.source_id) parts.push(`Import #${f.source_id}`);
+  return parts.length ? parts.join(" · ") : "All transactions";
+};
+
+// The query string for a set of filters, as /transactions and the API read it.
+SB.filterQuery = (filters) => new URLSearchParams(Object.entries(filters || {}).filter(([, v]) => v)).toString();
+
+// "Download CSV" links: check the row limit first, so a refusal shows as a message
+// rather than the browser saving the error as a file.
+SB.guardDownload = function (link, messageBox) {
+  link.addEventListener("click", async (e) => {
+    e.preventDefault();
+    const url = link.getAttribute("href");
+    try {
+      const check = await SB.api(`${url}${url.includes("?") ? "&" : "?"}check=1`);
+      if (!check.allowed) {
+        SB.message(messageBox, `This matches ${SB.number(check.rows)} transactions. Narrow the filters to ` +
+          `${SB.number(check.limit)} or fewer to download it.`);
+        return;
+      }
+      SB.message(messageBox, "");
+      window.location.href = url;
+    } catch (error) {
+      SB.message(messageBox, error.message);
+    }
+  });
+};
+
 // A stored input value: numbers to 4 decimal places unless whole, text as is.
 SB.inputValue = (value) => typeof value === "number"
   ? (Number.isInteger(value) ? value.toLocaleString() : value.toFixed(4))

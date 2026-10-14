@@ -30,6 +30,8 @@ class Config:
 
     PER_PAGE_DEFAULT = 25
     PER_PAGE_MAX = 100
+    # Largest CSV download allowed, so one click cannot stream a million rows.
+    EXPORT_MAX_ROWS = int(os.environ.get("EXPORT_MAX_ROWS", 100_000))
 
 
 class TestConfig(Config):

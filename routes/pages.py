@@ -58,6 +58,18 @@ def case_detail(case_id):
     return render_template("case.html", active="alerts", case_id=case_id)
 
 
+@bp.get("/reports")
+@login_required
+def reports():
+    return render_template("reports.html", active="reports")
+
+
+@bp.get("/reports/<int:report_id>")
+@login_required
+def report_detail(report_id):
+    return render_template("report.html", active="reports", report_id=report_id)
+
+
 @bp.get("/predict")
 @login_required
 def predict():

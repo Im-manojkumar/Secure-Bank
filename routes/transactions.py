@@ -1,6 +1,5 @@
 """Transaction import, search and single-transaction prediction."""
 
-from datetime import datetime
 from pathlib import Path
 
 from flask import Blueprint, current_app, jsonify, request
@@ -8,31 +7,14 @@ from flask_login import current_user, login_required
 from sqlalchemy import select
 
 from ml.datasets import DEFAULT_PROFILE, PROFILES
-from models import DataSource, FraudCase, Prediction, Transaction, db
+from models import DataSource, Transaction, db
 from routes.auth import role_required
 from routes.pagination import paginate
 from services.ingestion import CSVImportError, import_transactions, record_failed_import
 from services.prediction import ModelNotReady, describe_models, predict_one
+from services.search import FilterError, clean_filters, transaction_query
 
 bp = Blueprint("transactions", __name__, url_prefix="/api")
-
-
-class FilterError(ValueError):
-    pass
-
-
-def _parse_date(value, name):
-    try:
-        return datetime.fromisoformat(value)
-    except ValueError:
-        raise FilterError(f"{name} must be a date like 2013-09-01 or 2013-09-01T10:30:00")
-
-
-def _parse_float(value, name):
-    try:
-        return float(value)
-    except ValueError:
-        raise FilterError(f"{name} must be a number")
 
 
 @bp.post("/transactions/import")
@@ -77,38 +59,10 @@ def list_transactions():
     Filters (all optional): source_id, dataset, date_from, date_to, min_amount,
     max_amount, prediction (suspicious | low_risk), status (a case status).
     """
-    args = request.args
-    query = select(Transaction).join(Prediction, Prediction.transaction_id == Transaction.id, isouter=True)
     try:
-        if "dataset" in args:
-            if args["dataset"] not in PROFILES:
-                raise FilterError(f"dataset must be one of: {', '.join(PROFILES)}")
-            query = query.join(DataSource, DataSource.id == Transaction.source_id).where(
-                DataSource.dataset == args["dataset"]
-            )
-        if "source_id" in args:
-            query = query.where(Transaction.source_id == int(_parse_float(args["source_id"], "source_id")))
-        if "date_from" in args:
-            query = query.where(Transaction.timestamp >= _parse_date(args["date_from"], "date_from"))
-        if "date_to" in args:
-            query = query.where(Transaction.timestamp <= _parse_date(args["date_to"], "date_to"))
-        if "min_amount" in args:
-            query = query.where(Transaction.amount >= _parse_float(args["min_amount"], "min_amount"))
-        if "max_amount" in args:
-            query = query.where(Transaction.amount <= _parse_float(args["max_amount"], "max_amount"))
-        if "prediction" in args:
-            labels = {"suspicious": 1, "low_risk": 0}
-            if args["prediction"] not in labels:
-                raise FilterError("prediction must be suspicious or low_risk")
-            query = query.where(Prediction.predicted_label == labels[args["prediction"]])
-        if "status" in args:
-            query = query.join(FraudCase, FraudCase.transaction_id == Transaction.id).where(
-                FraudCase.status == args["status"]
-            )
+        query = transaction_query(clean_filters(request.args))
     except FilterError as exc:
         return jsonify(error=str(exc)), 400
-
-    query = query.order_by(Transaction.timestamp.desc(), Transaction.id.desc())
     return paginate(query, lambda t: t.to_dict())
 
 

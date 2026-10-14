@@ -20,6 +20,9 @@ ACTIONS = (
     "import_failed",
     "case_updated",
     "user_created",
+    "report_saved",
+    "report_deleted",
+    "report_exported",
 )
 
 # Failed logins allowed per email and IP address within the window before blocking.

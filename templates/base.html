@@ -18,6 +18,7 @@
       <a href="{{ url_for('pages.dashboard') }}" {% if active == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
       <a href="{{ url_for('pages.transactions') }}" {% if active == 'transactions' %}aria-current="page"{% endif %}>Transactions</a>
       <a href="{{ url_for('pages.alerts') }}" {% if active == 'alerts' %}aria-current="page"{% endif %}>Alerts</a>
+      <a href="{{ url_for('pages.reports') }}" {% if active == 'reports' %}aria-current="page"{% endif %}>Reports</a>
       <a href="{{ url_for('pages.predict') }}" {% if active == 'predict' %}aria-current="page"{% endif %}>Check a transaction</a>
       {% if current_user.is_admin %}
       <a href="{{ url_for('pages.import_page') }}" {% if active == 'import' %}aria-current="page"{% endif %}>Import</a>
