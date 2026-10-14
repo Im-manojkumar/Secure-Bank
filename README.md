@@ -1,5 +1,7 @@
 # SecureBank: AI-Powered Fraud Detection
 
+[![Tests](https://github.com/Im-manojkumar/Secure-Bank/actions/workflows/tests.yml/badge.svg)](https://github.com/Im-manojkumar/Secure-Bank/actions/workflows/tests.yml)
+
 SecureBank is a web application that imports bank transactions, scores them for fraud with a machine-learning model, and lets analysts review suspicious cases from one dashboard.
 
 This repository is built in stages:
@@ -7,7 +9,7 @@ This repository is built in stages:
 1. **Fraud model** (done): train and compare four classifiers on the Kaggle credit-card dataset.
 2. **Flask backend and SQLite database** (done): CSV import, prediction API, login and roles.
 3. **Dashboard and case review** (done): fraud statistics, transaction search, alerts and investigation notes.
-4. Testing, security and documentation.
+4. **Testing, security and documentation** (done): audit log, login limits, CSRF and CSP protection, automated tests on GitHub, and architecture and test-case docs.
 
 ## Setup
 
@@ -125,6 +127,7 @@ There are two roles. An **admin** can do everything, including importing files. 
 | Case (`/cases/<id>`) | The flagged transaction and a review form for status, outcome and investigation notes |
 | Check a transaction (`/predict`) | Score any set of values, or start from an imported transaction and change it |
 | Import (`/import`, admins only) | Upload a CSV with a progress bar, and see the history of past imports |
+| Audit log (`/audit`, admins only) | Every login, failed login, import, case change and new user, with filters |
 
 ![Dashboard](docs/screenshots/dashboard-light.png)
 
@@ -151,6 +154,7 @@ Every endpoint except login needs a logged-in session cookie. Errors come back a
 | `GET /api/alerts` | logged in | Fraud cases with the highest risk first, optionally filtered with `?status=Open` |
 | `GET /api/cases/<id>` | logged in | One fraud case |
 | `PATCH /api/cases/<id>` | admin, analyst | Update `status` (`Open`, `Under Review` or `Resolved`), `review_notes` and `outcome` (`Confirmed fraud` or `Legitimate`, required to resolve a case) |
+| `GET /api/audit` | admin | Audit log, newest first, with filters `action` and `subject` |
 | `GET /api/dashboard/summary` | logged in | Totals, predicted fraud, cases by status and a trend by day, or by hour with `?granularity=hour` |
 
 List endpoints take `page` and `per_page` (at most 100).
@@ -165,13 +169,30 @@ curl -b cookies.txt -X PATCH -H "Content-Type: application/json" \
   -d '{"status":"Under Review","review_notes":"Called the cardholder"}' http://127.0.0.1:5000/api/cases/1
 ```
 
+## Security
+
+The main protections are:
+- **Passwords:** stored as salted scrypt hashes.
+- **Login limit:** 5 failed logins per email and IP address in 15 minutes.
+- **Roles:** checked on every route.
+- **Cross-site requests:** blocked by `SameSite` cookies and an `Origin` check.
+- **Scripts and styles:** a strict Content-Security-Policy, with no inline scripts or styles on any page.
+- **Audit log:** every sensitive action is recorded.
+
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#security) lists each risk, how it is handled, and the known limits.
+
+Before running anywhere other than your own machine:
+- Set a long random `SECRET_KEY`. Without one, a random key is generated and logins reset on every restart.
+- Serve the app over HTTPS and set `SESSION_COOKIE_SECURE=1`.
+- Use a production server such as gunicorn rather than `flask run`.
+
 ## Tests
 
 ```bash
 pytest
 ```
 
-The tests use generated data and an in-memory database, so they run without the real dataset. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) and every page (login redirects, the admin-only import page and safe redirects after login).
+There are 72 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log and the security protections.
 
 ## Project layout
 
@@ -189,6 +210,7 @@ ml/
   evaluate.py     metrics, threshold choice and charts
   predict.py      load the saved model and score new rows
   sample_data.py  generate fake data with the same columns
+docs/             architecture, test cases and screenshots
   artifacts/      saved model, metrics and charts
 data/raw/         creditcard.csv goes here (not committed)
 tests/            pytest tests

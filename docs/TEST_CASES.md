@@ -1,0 +1,95 @@
+# SecureBank test cases
+
+All of these run automatically with `pytest`, locally and on every push and pull request through GitHub Actions (`.github/workflows/tests.yml`). The tests use generated data and an in-memory database, so they run without the Kaggle file. Each row names the test that checks it.
+
+## 1. Machine learning (`tests/test_ml.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| ML-01 | Dataset missing a column | Rejected with the column named | `test_load_data_rejects_missing_columns` |
+| ML-02 | Dataset file not found | Error says where to put `creditcard.csv` | `test_load_data_missing_file_has_helpful_message` |
+| ML-03 | Dataset with duplicate rows | Duplicates removed | `test_load_data_drops_duplicates` |
+| ML-04 | Train, validation and test split | Splits don't overlap and each keeps the fraud rate | `test_split_is_stratified_and_disjoint` |
+| ML-05 | Threshold choice | Threshold separates fraud from non-fraud when the scores allow it | `test_best_f1_threshold_separates_perfect_scores` |
+| ML-06 | Full training run | Four models compared, model and reports saved, best model finds over 70% of fraud in the test data | `test_train_saves_model_that_scores_new_rows` |
+
+## 2. Login and roles (`tests/test_api.py`, `tests/test_pages.py`, `tests/test_security.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| AU-01 | API call without logging in | HTTP 401, "Please log in first." | `test_endpoints_require_login` |
+| AU-02 | Page visit without logging in | Redirect to the login page, which returns to the page afterwards | `test_pages_redirect_to_login_when_logged_out` |
+| AU-03 | Wrong password vs unknown email | Same error for both, so emails can't be probed | `test_login_rejects_wrong_password_with_generic_message` |
+| AU-04 | Log in, then log out | Session works, then ends | `test_login_me_and_logout` |
+| AU-05 | Analyst tries to import | HTTP 403 | `test_analyst_cannot_import` |
+| AU-06 | Analyst opens the import or audit page | "No access" page (403), and the link is hidden | `test_import_page_is_admin_only`, `test_audit_page_is_admin_only` |
+| AU-07 | 5 wrong passwords in 15 minutes | 6th attempt refused with 429, even with the right password, and other accounts are unaffected | `test_login_blocked_after_repeated_failures` |
+| AU-08 | Failures, then a success, then failures again | Count resets after the successful login | `test_successful_login_resets_the_failure_count` |
+| AU-09 | `?next=https://evil.example` on login | Ignored, user goes to the dashboard | `test_login_page_ignores_offsite_next` |
+
+## 3. Importing transactions (`tests/test_api.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| IM-01 | Valid CSV of 1,000 rows | All stored, each scored, and an Open case for every flagged row | `test_import_stores_transactions_predictions_and_cases` |
+| IM-02 | Same file imported twice | Second import adds nothing | `test_reimporting_same_file_skips_duplicates` |
+| IM-03 | Rows with text in a number column, a negative amount, or `Class` = 7 | Those rows skipped and counted, and the rest imported | `test_import_skips_invalid_rows_and_reports_them` |
+| IM-04 | File missing a column | Rejected (400), and the failed import is still recorded | `test_import_rejects_missing_columns_and_records_failure` |
+| IM-05 | Non-CSV file, or no file | Rejected (400) | `test_import_rejects_non_csv_and_missing_file` |
+| IM-06 | File without `Class` | Imported, with no dataset label | `test_import_works_without_class_column` |
+| IM-07 | Same rows, `Time` written as `10` in one file and `10.0` in another | Treated as duplicates | `test_duplicate_check_ignores_number_formatting` |
+
+## 4. Search, prediction and cases (`tests/test_api.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| TX-01 | List transactions | Paginated, at most 100 per page | `test_list_transactions_paginates` |
+| TX-02 | Filter by prediction, amount, date and case status | Only matching rows returned | `test_list_transactions_filters` |
+| TX-03 | Filter with bad values | 400 with a message | `test_list_transactions_rejects_bad_filters` |
+| TX-04 | Open one transaction, or a missing one | All 30 model inputs shown, or 404 | `test_get_transaction_includes_features` |
+| PR-01 | Check a valid transaction | Result, risk score and model version returned | `test_predict_scores_a_transaction` |
+| PR-02 | Check with a missing or non-numeric field | 400 listing each problem | `test_predict_validates_input` |
+| CA-01 | Alerts list | Highest risk first, and an unknown status rejected | `test_alerts_sorted_by_risk` |
+| CA-02 | Review a case: Under Review, then Resolved, then reopened | Reviewer recorded. Resolving needs an outcome. The prediction is unchanged. Reopening clears the outcome. | `test_case_review_flow` |
+| CA-03 | Bad case updates | Unknown status, unknown field, empty body, outcome without resolving, or non-text notes give 400. A missing case gives 404. | `test_case_update_validation` |
+| DB-01 | Dashboard summary | Totals match, and the hourly trend adds up | `test_dashboard_summary` |
+| DB-02 | Dashboard with no data | Zeros, no errors | `test_dashboard_summary_empty_database` |
+
+## 5. Audit log (`tests/test_security.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| AL-01 | Failed login, login, logout | Three entries, with email and IP address | `test_logins_and_logout_are_audited` |
+| AL-02 | Case resolved | Entry records the status and outcome before and after | `test_case_update_is_audited_with_before_and_after` |
+| AL-03 | Rejected case update | Nothing logged | `test_rejected_case_update_is_not_audited` |
+| AL-04 | Import that works and one that fails | Both logged with the file name | `test_imports_are_audited` |
+| AL-05 | User created from the command line | Logged with the role | `test_cli_create_user_is_audited` |
+| AL-06 | Audit log API | Admin only, newest first, and filters by action and subject | `test_audit_api_is_admin_only_and_filters` |
+
+## 6. Web security (`tests/test_security.py`, `tests/test_pages.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| WS-01 | POST from another website | 403 "Cross-site request blocked." | `test_cross_site_api_writes_are_blocked` |
+| WS-02 | POST from SecureBank's own pages | Allowed | `test_same_site_api_writes_are_allowed` |
+| WS-03 | Security headers | CSP, `nosniff`, `DENY` framing, and `no-store` on the API | `test_security_headers` |
+| WS-04 | Every page | No inline scripts or styles that the CSP would block | `test_pages_have_no_inline_scripts_or_styles` |
+| WS-05 | Unknown page or API route | HTML 404 page, or JSON error | `test_unknown_page_shows_html_404`, `test_api_errors_are_json` |
+
+## 7. Manual checks in a browser
+
+These were run in Chromium against the full Kaggle dataset (283,726 transactions).
+
+| ID | Steps | Expected result |
+|---|---|---|
+| UI-01 | Log in with a wrong password, then the right one | Error message, then the dashboard |
+| UI-02 | Hover a bar on either dashboard chart | Tooltip with the hour and count |
+| UI-03 | Search transactions with Prediction set to Suspicious and Min amount 500 | 27 results, all suspicious and €500 or more |
+| UI-04 | Open an alert, choose Resolved without an outcome, then save | "Choose an outcome before resolving the case." |
+| UI-05 | Choose an outcome, type notes containing `<script>`, then save | "Review saved." The notes show as plain text and nothing runs. |
+| UI-06 | Check a transaction, starting from transaction 542 | Values filled in, then "Low risk" with its score and the threshold marker |
+| UI-07 | As an admin, upload a CSV on the Import page | Progress bar, then the result message and a new history row |
+| UI-08 | Open the Audit log as an admin | Every action above listed, and case entries link to the case |
+| UI-09 | Repeat UI-01 with the system set to dark mode | Readable dark theme |
+| UI-10 | Use a 390 px wide phone screen | No sideways scrolling, and the menu scrolls on one line |
+| UI-11 | Watch the browser console on every page | No script errors and no Content-Security-Policy violations |
