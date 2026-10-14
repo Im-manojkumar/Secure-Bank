@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Transactions{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Transactions</h1>
+    <p class="lede">Search every imported transaction. Click a row for details.</p>
+  </div>
+</div>
+
+<form class="card filters" id="filters">
+  <div><label for="f-from">From</label><input id="f-from" name="date_from" type="datetime-local"></div>
+  <div><label for="f-to">To</label><input id="f-to" name="date_to" type="datetime-local"></div>
+  <div><label for="f-min">Min amount (€)</label><input id="f-min" name="min_amount" type="number" min="0" step="0.01"></div>
+  <div><label for="f-max">Max amount (€)</label><input id="f-max" name="max_amount" type="number" min="0" step="0.01"></div>
+  <div>
+    <label for="f-prediction">Prediction</label>
+    <select id="f-prediction" name="prediction">
+      <option value="">Any</option>
+      <option value="suspicious">Suspicious</option>
+      <option value="low_risk">Low risk</option>
+    </select>
+  </div>
+  <div>
+    <label for="f-status">Case status</label>
+    <select id="f-status" name="status">
+      <option value="">Any</option>
+      <option>Open</option>
+      <option>Under Review</option>
+      <option>Resolved</option>
+    </select>
+  </div>
+  <div>
+    <label for="f-source">Import</label>
+    <select id="f-source" name="source_id"><option value="">Any</option></select>
+  </div>
+  <div class="actions">
+    <button class="btn btn-primary" type="submit">Search</button>
+    <button class="btn" type="reset">Clear</button>
+  </div>
+</form>
+
+<p id="tx-error" role="alert" hidden></p>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Time</th><th class="num">Amount</th><th>Prediction</th><th class="num">Risk score</th><th>Case</th></tr>
+      </thead>
+      <tbody id="tx-body"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pager" id="tx-pager"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/transactions.js') }}"></script>
+{% endblock %}

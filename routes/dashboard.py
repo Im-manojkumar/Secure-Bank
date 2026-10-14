@@ -1,6 +1,6 @@
 """Summary numbers for the dashboard."""
 
-from flask import Blueprint, jsonify
+from flask import Blueprint, jsonify, request
 from flask_login import login_required
 from sqlalchemy import func, select
 
@@ -31,12 +31,17 @@ def summary():
         ).all()
     )
 
-    day = func.date(Transaction.timestamp)
+    # ?granularity=hour groups the trend by hour (the Kaggle data covers only two days).
+    # strftime is SQLite-specific; a PostgreSQL move would use date_trunc instead.
+    if request.args.get("granularity") == "hour":
+        bucket = func.strftime("%Y-%m-%d %H:00", Transaction.timestamp)
+    else:
+        bucket = func.date(Transaction.timestamp)
     trend = db.session.execute(
-        select(day, func.count(Transaction.id), func.sum(Prediction.predicted_label))
+        select(bucket, func.count(Transaction.id), func.sum(Prediction.predicted_label))
         .join(Prediction, Prediction.transaction_id == Transaction.id)
-        .group_by(day)
-        .order_by(day)
+        .group_by(bucket)
+        .order_by(bucket)
     ).all()
 
     return jsonify(
@@ -47,7 +52,7 @@ def summary():
         cases_by_status={s: status_counts.get(s, 0) for s in CASE_STATUSES},
         pending_review=status_counts.get("Open", 0) + status_counts.get("Under Review", 0),
         resolved_outcomes=outcome_counts,
-        daily_trend=[
-            {"date": str(d), "transactions": n, "suspicious": int(s or 0)} for d, n, s in trend
+        trend=[
+            {"period": str(p), "transactions": n, "suspicious": int(s or 0)} for p, n, s in trend
         ],
     )

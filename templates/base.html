@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}SecureBank{% endblock %} · SecureBank</title>
+  <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  {% if current_user.is_authenticated %}
+  <header class="topbar">
+    <a class="brand" href="{{ url_for('pages.dashboard') }}">
+      <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="currentColor"/></svg>
+      SecureBank
+    </a>
+    <nav class="nav" aria-label="Main">
+      <a href="{{ url_for('pages.dashboard') }}" {% if active == 'dashboard' %}aria-current="page"{% endif %}>Dashboard</a>
+      <a href="{{ url_for('pages.transactions') }}" {% if active == 'transactions' %}aria-current="page"{% endif %}>Transactions</a>
+      <a href="{{ url_for('pages.alerts') }}" {% if active == 'alerts' %}aria-current="page"{% endif %}>Alerts</a>
+      <a href="{{ url_for('pages.predict') }}" {% if active == 'predict' %}aria-current="page"{% endif %}>Check a transaction</a>
+      {% if current_user.is_admin %}
+      <a href="{{ url_for('pages.import_page') }}" {% if active == 'import' %}aria-current="page"{% endif %}>Import</a>
+      {% endif %}
+    </nav>
+    <div class="user">
+      <span class="user-email">{{ current_user.email }}</span>
+      <span class="badge">{{ current_user.role }}</span>
+      <button type="button" class="btn btn-quiet" id="logout">Log out</button>
+    </div>
+  </header>
+  {% endif %}
+
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+
+  <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

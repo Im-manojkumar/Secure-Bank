@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Check a transaction{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Check a transaction</h1>
+    <p class="lede">Enter a transaction's values and the model scores it. Nothing is saved.</p>
+  </div>
+</div>
+
+<section class="grid two-col">
+  <form class="card" id="load-form">
+    <h2>Start from an existing transaction</h2>
+    <p class="muted">Copies the values of an imported transaction, which you can then change.</p>
+    <div class="actions">
+      <input id="load-id" type="number" min="1" placeholder="Transaction ID" aria-label="Transaction ID" style="max-width:180px">
+      <button class="btn" type="submit">Load values</button>
+    </div>
+    <p id="load-message" role="status" hidden></p>
+  </form>
+
+  <div class="card" aria-live="polite">
+    <h2>Result</h2>
+    <div id="result"><p class="muted">Fill in the values and press Check.</p></div>
+  </div>
+</section>
+
+<form class="card" id="predict-form">
+  <h2>Transaction values</h2>
+  <div class="features" id="inputs"></div>
+  <p id="predict-error" role="alert" hidden></p>
+  <div class="actions" style="margin-top:16px">
+    <button class="btn btn-primary" type="submit">Check</button>
+    <button class="btn" type="reset">Clear</button>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/predict.js') }}"></script>
+{% endblock %}

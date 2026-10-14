@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Log in{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <form class="card login-card" id="login-form" novalidate>
+    <div class="brand">
+      <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><path d="M12 2 4 5v6c0 5 3.4 9.4 8 11 4.6-1.6 8-6 8-11V5l-8-3Z" fill="currentColor"/></svg>
+      SecureBank
+    </div>
+    <h1>Log in</h1>
+    <p class="lede">Fraud detection and case review.</p>
+    <div class="field">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="username" required autofocus>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <p id="login-error" role="alert" hidden></p>
+    <button class="btn btn-primary" type="submit" style="width:100%">Log in</button>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  const form = document.getElementById("login-form");
+  const errorBox = document.getElementById("login-error");
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const button = form.querySelector("button");
+    button.disabled = true;
+    try {
+      await SB.api("/api/auth/login", { method: "POST", json: { email: form.email.value, password: form.password.value } });
+      window.location.href = {{ next_url|tojson }};
+    } catch (error) {
+      SB.message(errorBox, error.message);
+      button.disabled = false;
+    }
+  });
+</script>
+{% endblock %}

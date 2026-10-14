@@ -12,7 +12,7 @@ import warnings
 from pathlib import Path
 
 import click
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_login import LoginManager
 from werkzeug.exceptions import HTTPException
 
@@ -37,9 +37,9 @@ def create_app(config_class=Config):
     db.init_app(app)
     login_manager.init_app(app)
 
-    from routes import alerts, auth, dashboard, transactions
+    from routes import alerts, auth, dashboard, pages, transactions
 
-    for module in (auth, transactions, alerts, dashboard):
+    for module in (auth, transactions, alerts, dashboard, pages):
         app.register_blueprint(module.bp)
 
     register_error_handlers(app)
@@ -59,7 +59,10 @@ def load_user(user_id):
 
 @login_manager.unauthorized_handler
 def unauthorized():
-    return jsonify(error="Please log in first."), 401
+    # API calls get JSON; pages send the browser to the login page.
+    if request.path.startswith("/api/"):
+        return jsonify(error="Please log in first."), 401
+    return redirect(url_for("pages.login", next=request.full_path.rstrip("?")))
 
 
 def register_error_handlers(app):
@@ -69,6 +72,13 @@ def register_error_handlers(app):
         if request.path.startswith("/api/"):
             messages = {413: "The file is too large."}
             return jsonify(error=messages.get(exc.code, exc.description)), exc.code
+        pages = {
+            403: ("No access", "Your role does not allow this page."),
+            404: ("Page not found", "This page does not exist."),
+        }
+        if exc.code in pages:
+            title, message = pages[exc.code]
+            return render_template("error.html", code=exc.code, title=title, message=message), exc.code
         return exc
 
 
