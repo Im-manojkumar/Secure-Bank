@@ -4,14 +4,27 @@
 
 SecureBank is a web application that imports bank transactions, scores them for fraud with machine-learning models, explains why each suspicious transaction was flagged, and lets analysts review suspicious cases from one dashboard.
 
-This repository is built in stages:
+## What it does
 
-1. **Fraud model** (done): train and compare classifiers on the Kaggle credit-card dataset.
-2. **Flask backend and SQLite database** (done): CSV import, prediction API, login and roles.
-3. **Dashboard and case review** (done): fraud statistics, transaction search, alerts and investigation notes.
-4. **Testing, security and documentation** (done): audit log, login limits, CSRF and CSP protection, automated tests on GitHub, and architecture and test-case docs.
-5. **More datasets and explanations** (done): separate models for the Sparkov and PaySim datasets, gradient boosting as a fifth model, and the reasons behind each alert.
-6. **Saved reports** (done): name a transaction search, re-run it with live totals, and download the results as CSV.
+- **Fraud models for three datasets:** the Kaggle credit-card data, the Sparkov card data and the PaySim mobile-money data. Five models are compared on each (Logistic Regression, Decision Tree, Random Forest, linear SVM and Gradient Boosting), trained on older transactions and tested on later ones.
+- **Cost-based alerts:** each model's alert threshold is the one that costs least, weighing a review fee against the amount of each missed fraud.
+- **Why it was flagged:** every alert lists the three inputs that raised its score most.
+- **Web app and JSON API:** a dashboard, transaction search, alert queue, case review with notes and outcomes, a page to check any transaction, and saved reports with CSV download. There are two roles, admin and analyst.
+- **Imports in the background:** CSV files are checked, imported in chunks with live progress, scored, and checked for drift away from the data the model learned from.
+- **Live scoring:** payment systems can score a transaction before approving it, with an API key, and get approve, review or decline.
+- **Learning from analysts:** retrain a model with the verdicts analysts gave on its alerts.
+- **Security:** two-factor login, a login limit, CSRF and Content-Security-Policy protection, an audit log of every sensitive action, and hashed card numbers and API keys.
+- **Ready to deploy:** a Docker setup with HTTPS, nightly database backups, and 167 automated tests that run on GitHub for every change.
+
+The project was built in stages, each one a pull request:
+
+1. **Fraud model:** train and compare classifiers on the Kaggle credit-card dataset.
+2. **Flask backend and SQLite database:** CSV import, prediction API, login and roles.
+3. **Dashboard and case review:** fraud statistics, transaction search, alerts and investigation notes.
+4. **Testing, security and documentation:** audit log, login limits, CSRF and CSP protection, automated tests on GitHub, and architecture and test-case docs.
+5. **More datasets and explanations:** separate models for the Sparkov and PaySim datasets, gradient boosting as a fifth model, and the reasons behind each alert.
+6. **Saved reports:** name a transaction search, re-run it with live totals, and download the results as CSV.
+7. **Real-world readiness:** a time-based train/test split, cost-based alert thresholds, card history inputs for Sparkov, retraining from analyst decisions, drift checks, the live scoring API, two-factor login, Docker with HTTPS and backups, and background imports.
 
 ## Setup
 
@@ -178,7 +191,7 @@ flask --app app import-csv data/raw/creditcard.csv
 flask --app app run
 ```
 
-Then open http://127.0.0.1:5000 and log in.
+Then open http://127.0.0.1:5000 and log in. An admin is first sent to the Account page to set up two-factor login with an authenticator app, such as Google Authenticator; set `REQUIRE_2FA_FOR_ADMINS=0` to skip this while trying the app locally.
 
 Import Sparkov's `fraudTest.csv` or `paysim.csv` the same way. Importing the credit card file takes about a minute and makes a database of about 350 MB in `instance/securebank.db`, which is not committed. Importing the same rows again skips them as duplicates.
 
@@ -212,6 +225,7 @@ Then, for every file:
 | Case (`/cases/<id>`) | The flagged transaction, why it was flagged, and a review form for status, outcome and investigation notes |
 | Check a transaction (`/predict`) | Pick a format, score any set of values and see what raised the score, or start from an imported transaction and change it |
 | Import (`/import`, admins only) | Upload a CSV and follow the import's progress while it runs in the background, and see the history of past imports |
+| Account (`/account`) | Your email and role, and two-factor login setup |
 | Audit log (`/audit`, admins only) | Every login, failed login, import, case change and new user, with filters |
 
 ![Dashboard](docs/screenshots/dashboard-light.png)
@@ -256,8 +270,20 @@ Every endpoint except login and the live scoring API needs a logged-in session c
 | `PATCH /api/cases/<id>` | admin, analyst | Update `status` (`Open`, `Under Review` or `Resolved`), `review_notes` and `outcome` (`Confirmed fraud` or `Legitimate`, required to resolve a case) |
 | `GET /api/audit` | admin | Audit log, newest first, with filters `action` and `subject` |
 | `GET /api/dashboard/summary` | logged in | Totals, predicted fraud, flagged amounts per currency, cases by status and a trend by day, or by hour with `?granularity=hour`; `?dataset=` limits it to one format |
+| `POST /api/v1/score` | API key | Score a payment before it is approved (see [Live scoring API](#live-scoring-api)) |
+| `GET /api/health` | anyone | Whether the app can reach its database, for uptime monitors |
 
 List endpoints take `page` and `per_page` (at most 100).
+
+Example with curl (add `"code"` to the login if two-factor login is on):
+
+```bash
+curl -c cookies.txt -H "Content-Type: application/json" \
+  -d '{"email":"admin@securebank.local","password":"..."}' http://127.0.0.1:5000/api/auth/login
+curl -b cookies.txt "http://127.0.0.1:5000/api/alerts?status=Open&per_page=5"
+curl -b cookies.txt -X PATCH -H "Content-Type: application/json" \
+  -d '{"status":"Under Review","review_notes":"Called the cardholder"}' http://127.0.0.1:5000/api/cases/1
+```
 
 ### Live scoring API
 
@@ -274,16 +300,6 @@ The answer has a `decision`: **approve** below the model's alert threshold, **re
 
 The transaction, prediction and any case are saved like an imported row, under a source named "Live API: <key name>", so they appear on the dashboard and in the alert queue. `card_number` is optional and only used by Sparkov, to compare the payment with the card's history; it is never stored. Sending the same transaction again (a retry) returns the first answer and saves nothing new. `flask --app app revoke-api-key <first 12 characters>` turns a key off. Only a SHA-256 hash of each key is stored.
 
-Example with curl:
-
-```bash
-curl -c cookies.txt -H "Content-Type: application/json" \
-  -d '{"email":"admin@securebank.local","password":"..."}' http://127.0.0.1:5000/api/auth/login
-curl -b cookies.txt "http://127.0.0.1:5000/api/alerts?status=Open&per_page=5"
-curl -b cookies.txt -X PATCH -H "Content-Type: application/json" \
-  -d '{"status":"Under Review","review_notes":"Called the cardholder"}' http://127.0.0.1:5000/api/cases/1
-```
-
 ## Security
 
 The main protections are:
@@ -293,7 +309,9 @@ The main protections are:
 - **Roles:** checked on every route.
 - **Cross-site requests:** blocked by `SameSite` cookies and an `Origin` check.
 - **Scripts and styles:** a strict Content-Security-Policy, with no inline scripts or styles on any page.
-- **Audit log:** every sensitive action is recorded, including every CSV download.
+- **API keys:** only a SHA-256 hash of each live scoring key is stored, and a key can be revoked.
+- **Card numbers:** never stored; a keyed hash links a card's payments.
+- **Audit log:** every sensitive action is recorded, including every CSV download and retrain.
 - **CSV downloads:** cells that a spreadsheet would run as a formula are made plain text, and downloads are capped at 100,000 rows.
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#security) lists each risk, how it is handled, and the known limits.
@@ -327,24 +345,25 @@ There are 167 tests, which run on GitHub for every push and pull request. They u
 ## Project layout
 
 ```
-app.py            Flask app factory and CLI commands (init-db, create-user, import-csv, import-worker, retrain, create-api-key, revoke-api-key, backup-db)
+app.py            Flask app factory, health check and CLI commands (init-db, create-user, import-csv, import-worker, retrain, create-api-key, revoke-api-key, backup-db)
 config.py         settings, overridable with environment variables
 models.py         database tables
-routes/           API endpoints (auth, transactions, alerts, reports, dashboard, audit) and HTML pages (pages.py)
+routes/           API endpoints (auth, transactions, alerts, reports, dashboard, audit, live scoring) and HTML pages (pages.py)
 templates/        Jinja page templates
 static/           CSS and JavaScript for the pages
-services/         import, prediction, search and case logic used by the routes
+services/         import and background jobs, prediction, live scoring, search, cases, audit, retraining feedback and two-factor codes
 ml/
   datasets.py     the three formats: columns, cleaning and model inputs
   preprocess.py   load, validate and split a dataset
   train.py        build, train and compare the five models
   evaluate.py     metrics, threshold choice and charts
   explain.py      which inputs raised a transaction's score
+  drift.py        whether new data still looks like the training data
   predict.py      load a saved model, score and explain new rows
   sample_data.py  generate fake data in each format
   artifacts/      one folder per format with its model, metrics and charts
 docs/             architecture, deployment guide, test cases and screenshots
-Dockerfile        production image (gunicorn); docker-compose.yml adds Caddy for HTTPS
+Dockerfile        production image (gunicorn); docker-compose.yml adds Caddy for HTTPS and the import worker
 deploy/           Caddyfile and the example .env
 data/raw/         the dataset CSVs go here (not committed)
 tests/            pytest tests
