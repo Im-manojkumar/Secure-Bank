@@ -34,7 +34,7 @@ SecureBank understands three public fraud datasets. Each one has its own columns
 The model inputs for each format are defined in `ml/datasets.py`:
 
 - **creditcard:** `Time`, `V1` to `V28` and `Amount`, used as they are.
-- **sparkov:** amount, hour of day, night-time, day of week, customer age, city population, distance between customer and merchant, and merchant category. Names, street, job, ZIP code, gender and the full card number are never stored or used; only the card's last four digits are kept. Gender is left out of the model so that it cannot treat men and women differently.
+- **sparkov:** amount, hour of day, night-time, day of week, customer age, city population, distance between customer and merchant, merchant category, and the card's history: payments in the hour and day before, the amount against the card's average, hours since its last payment, and how many earlier payments it has. Names, street, job, ZIP code, gender and the full card number are never stored or used. Only the card's last four digits and a keyed hash of its number (`card_id`, which links its payments) are kept. Gender is left out of the model so that it cannot treat men and women differently.
 - **paysim:** transfer type, amount, the four balances, whether the transfer empties the account, and how far each balance fails to add up after the transfer.
 
 To try the code without the real files, generate fake data in any format:
@@ -107,13 +107,17 @@ With the earlier random split, the same model scored PR-AUC 0.858 and caught 74 
 
 | Model | Precision | Recall | F1 | PR-AUC | ROC-AUC | Missed fraud | False alerts | Total cost |
 |---|---|---|---|---|---|---|---|---|
-| Logistic Regression | 0.191 | 0.677 | 0.298 | 0.181 | 0.963 | 692 | 6,162 | $141,915 |
-| Decision Tree | 0.320 | 0.772 | 0.453 | 0.350 | 0.987 | 488 | 3,518 | $75,760 |
-| Random Forest | 0.386 | 0.881 | 0.537 | 0.805 | 0.994 | 255 | 3,002 | $78,207 |
-| SVM (linear) | 0.165 | 0.669 | 0.264 | 0.206 | 0.945 | 709 | 7,289 | $175,275 |
-| **Gradient Boosting** | 0.388 | 0.924 | 0.546 | **0.869** | 0.998 | 162 | 3,134 | $69,852 |
+| Logistic Regression | 0.192 | 0.706 | 0.301 | 0.196 | 0.964 | 631 | 6,384 | $142,831 |
+| Decision Tree | 0.309 | 0.742 | 0.436 | 0.315 | 0.987 | 554 | 3,556 | $104,766 |
+| Random Forest | 0.305 | 0.911 | 0.457 | 0.795 | 0.995 | 191 | 4,459 | $87,680 |
+| SVM (linear) | 0.165 | 0.709 | 0.267 | 0.227 | 0.950 | 624 | 7,715 | $180,381 |
+| **Gradient Boosting** | 0.609 | 0.900 | 0.727 | **0.902** | 0.998 | 215 | 1,238 | $64,983 |
 
-The cost rule pays off here. It sets the threshold at 0.473 instead of 0.926, so the model raises more alerts: it catches 1,983 of 2,145 frauds instead of 1,655, at the price of 3,134 false alerts instead of 280. Missed fraud falls from $90,187 to $18,682, and the total cost, reviews included, falls from $109,537 to $69,852, 36% less. Because most fraud here is worth hundreds of dollars, a $10 review is worth doing on fairly weak suspicion. `comparison.txt` shows both thresholds side by side. Linear models do badly here because fraud depends on combinations, such as a large online purchase late at night, that a single straight line cannot separate.
+Each payment is compared with the same card's earlier payments: how many it made in the hour and day before, the amount against the card's average, the time since its last payment, and how many payments it has made before. Card fraud tends to come in bursts of unusual amounts, which a single payment on its own does not show. These inputs raise test PR-AUC from 0.869 to 0.902, and at a similar catch rate (90% instead of 92%) the false alerts fall from 3,134 to 1,238.
+
+The cost rule pays off here too. It sets the threshold at 0.324 instead of the best-F1 threshold of 0.718, so the model catches 1,930 of 2,145 frauds instead of 1,761, at the price of 1,238 false alerts instead of 310. Missed fraud falls from $73,977 to $33,303, and the total cost, reviews included, falls from $94,687 to $64,983, 31% less. Because most fraud here is worth hundreds of dollars, a $10 review is worth doing on fairly weak suspicion. `comparison.txt` shows both thresholds side by side. Before the card history inputs, the same rule cost $69,852.
+
+Linear models do badly here because fraud depends on combinations, such as a large online purchase late at night, that a single straight line cannot separate.
 
 ### PaySim (1,293,438 test transactions, 4,244 fraud)
 
@@ -168,7 +172,7 @@ Then open http://127.0.0.1:5000 and log in.
 
 Import Sparkov's `fraudTest.csv` or `paysim.csv` the same way. Importing the credit card file takes about a minute and makes a database of about 350 MB in `instance/securebank.db`, which is not committed. Importing the same rows again skips them as duplicates.
 
-A database created before step 5 lacks the new `dataset` and `explanation` columns. Delete `instance/securebank.db` and run `init-db` again, because `init-db` only creates missing tables, not missing columns. A step 5 database only needs `init-db` run again to add the saved reports table.
+A database created before step 5 lacks the new `dataset` and `explanation` columns. Delete `instance/securebank.db` and run `init-db` again, because `init-db` only creates missing tables, not missing columns. A step 5 or later database only needs `init-db` run again: it adds new tables, and new optional columns such as `transactions.card_id`.
 
 There are two roles. An **admin** can do everything, including importing files. An **analyst** can search transactions, run predictions and review fraud cases.
 
@@ -259,6 +263,7 @@ The main protections are:
 
 Before running anywhere other than your own machine:
 - Set a long random `SECRET_KEY`. Without one, a random key is generated and logins reset on every restart.
+- Set a long random `CARD_ID_KEY` before the first import. It keys the hash that links a card's payments without storing its number; changing it later breaks the link between old and new payments.
 - Serve the app over HTTPS and set `SESSION_COOKIE_SECURE=1`.
 - Use a production server such as gunicorn rather than `flask run`.
 
@@ -268,7 +273,7 @@ Before running anywhere other than your own machine:
 pytest
 ```
 
-There are 122 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
+There are 127 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
 
 ## Project layout
 

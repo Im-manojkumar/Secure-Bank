@@ -13,6 +13,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import click
+import sqlalchemy
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_login import LoginManager
 from sqlalchemy import event
@@ -143,11 +144,35 @@ def register_error_handlers(app):
         return exc
 
 
+def add_missing_columns():
+    """Add columns introduced after a database was created (create_all skips existing tables).
+
+    Only nullable columns are added, so existing rows stay valid.
+    """
+    inspector = sqlalchemy.inspect(db.engine)
+    for table in db.metadata.sorted_tables:
+        if not inspector.has_table(table.name):
+            continue
+        present = {c["name"] for c in inspector.get_columns(table.name)}
+        for column in table.columns:
+            if column.name in present or not column.nullable:
+                continue
+            kind = column.type.compile(dialect=db.engine.dialect)
+            with db.engine.begin() as conn:
+                conn.execute(sqlalchemy.text(f'ALTER TABLE {table.name} ADD COLUMN "{column.name}" {kind}'))
+                if column.index:
+                    conn.execute(sqlalchemy.text(
+                        f'CREATE INDEX IF NOT EXISTS ix_{table.name}_{column.name} ON {table.name} ("{column.name}")'
+                    ))
+            click.echo(f"Added column {table.name}.{column.name}")
+
+
 def register_commands(app):
     @app.cli.command("init-db")
     def init_db():
-        """Create the database tables."""
+        """Create the database tables, and add columns that newer versions need."""
         db.create_all()
+        add_missing_columns()
         click.echo(f"Database ready at {app.config['SQLALCHEMY_DATABASE_URI']}")
 
     @app.cli.command("create-user")

@@ -101,6 +101,9 @@ class Transaction(db.Model):
     features = db.Column(JSON, nullable=False)
     # The label shipped with the dataset, when it has one. Kept for evaluation only.
     dataset_label = db.Column(db.Integer)
+    # Keyed hash of the card number (see ml/datasets.py), linking a card's payments
+    # so new ones can be compared with its history. Only Sparkov files have one.
+    card_id = db.Column(db.String(16), index=True)
     # Fingerprint of the row's values, used to skip duplicates across imports.
     row_hash = db.Column(db.String(40), unique=True, nullable=False)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)

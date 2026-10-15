@@ -2,7 +2,7 @@
   "dataset": "sparkov",
   "dataset_title": "Sparkov card payments",
   "model_name": "Gradient Boosting",
-  "threshold": 0.472976,
+  "threshold": 0.323864,
   "score_type": "probability",
   "features": [
     "amount",
@@ -26,10 +26,15 @@
     "cat_personal_care",
     "cat_shopping_net",
     "cat_shopping_pos",
-    "cat_travel"
+    "cat_travel",
+    "card_txn_1h",
+    "card_txn_24h",
+    "amount_vs_card_avg",
+    "hours_since_last",
+    "log_card_history"
   ],
   "smote": true,
-  "trained_at": "2026-10-15T14:54:11+00:00",
+  "trained_at": "2026-10-15T15:10:33+00:00",
   "split": "time",
   "rows": {
     "train": 972506,
@@ -40,11 +45,11 @@
   "review_cost": 10.0,
   "selection": "highest validation PR-AUC; threshold costs least on validation (missed fraud amount + review cost per alert)",
   "test_metrics": {
-    "precision": 0.3875,
-    "recall": 0.9245,
-    "f1": 0.5461,
-    "pr_auc": 0.8689,
-    "total_cost": 69851.82
+    "precision": 0.6092,
+    "recall": 0.8998,
+    "f1": 0.7265,
+    "pr_auc": 0.9016,
+    "total_cost": 64983.37
   },
   "baseline": {
     "amount": 47.19,
@@ -68,6 +73,11 @@
     "cat_personal_care": 0.0,
     "cat_shopping_net": 0.0,
     "cat_shopping_pos": 0.0,
-    "cat_travel": 0.0
+    "cat_travel": 0.0,
+    "card_txn_1h": 0.0,
+    "card_txn_24h": 3.0,
+    "amount_vs_card_avg": 0.6629162611032549,
+    "hours_since_last": 4.472777777777778,
+    "log_card_history": 4.61512051684126
   }
 }

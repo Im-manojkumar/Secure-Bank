@@ -94,7 +94,7 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | DS-04 | PaySim transfer that empties the sender's account | Inputs mark the emptied account, the receiver mismatch and the hour | `test_paysim_features_include_balance_mismatches` |
 | DS-05 | Training per format | Each format has its own model, with a typical genuine row saved for explanations | `test_each_format_trains_its_own_model` |
 | DS-06 | Explaining flagged fake Sparkov fraud (large late-night online buys) | Amount, time of day or category lead the reasons; at most 3 reasons, each with value, typical value and effect | `test_explanations_name_the_planted_pattern` |
-| DS-07 | Import a Sparkov file and a PaySim file | Scored by the matching model, right currency (USD, none), reasons stored for suspicious rows, re-import adds nothing | `test_import_scores_each_format_with_its_model` |
+| DS-07 | Import a Sparkov file and a PaySim file | Scored by the matching model, right currency (USD, none), reasons stored for suspicious rows, card number never stored, re-import adds nothing | `test_import_scores_each_format_with_its_model` |
 | DS-08 | Low-risk rows | No explanation stored | `test_low_risk_rows_store_no_explanation` |
 | DS-09 | File matching no format, or Sparkov missing `dob` | 400; the message names the closest format and the missing column | `test_import_rejects_unknown_format`, `test_import_names_missing_columns_of_the_closest_format` |
 | DS-10 | Import when the format has no trained model | 503 naming the training command | `test_import_without_a_trained_model_is_refused` |
@@ -103,6 +103,11 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | DS-13 | Check with bad values in each format | 400 listing each problem; unknown format refused | `test_predict_validates_each_format`, `test_transaction_filter_rejects_unknown_dataset` |
 | DS-14 | Dashboard with euro and dollar imports | Flagged amounts totalled per currency, never mixed | `test_dashboard_totals_flagged_amounts_per_currency` |
 | DS-15 | Dashboard and alerts limited to one format, by day or by hour | Totals, cases, trend and alerts cover only that format; an unknown format gives 400 | `test_dashboard_and_alerts_filter_by_dataset` |
+| DS-16 | Card history inputs | Count only the same card's earlier payments: within an hour, within a day, amount against its average, hours since its last | `test_card_history_counts_only_earlier_payments_of_the_same_card` |
+| DS-17 | Card history with past payments that are not scored | Earlier payments of the same card count; other cards and later payments do not | `test_card_history_uses_earlier_payments_that_are_not_scored` |
+| DS-18 | Card IDs | The same number always gives the same 16-character ID, which does not contain the number | `test_card_ids_are_stable_and_hide_the_number` |
+| DS-19 | Import a Sparkov file in two parts | Every payment stored with its card ID; the second part finds the first part's payments as history | `test_import_compares_payments_with_the_card_history_already_stored` |
+| DS-20 | `init-db` on a database from before `card_id` existed | Column and index added; running again changes nothing | `test_init_db_adds_columns_missing_from_an_older_database` |
 
 ## 8. Saved reports and CSV downloads (`tests/test_reports.py`)
 
