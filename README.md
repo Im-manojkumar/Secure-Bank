@@ -63,7 +63,7 @@ Sparkov and PaySim take about 5 to 10 minutes each and need a few GB of memory, 
    - Random Forest (ensemble)
    - Linear SVM (a kernel SVM would take hours on this many rows)
    - Gradient Boosting (trees that each correct the ones before)
-5. Picks the model with the best **PR-AUC** on the validation set, then picks its alert threshold to maximise F1 on the validation set.
+5. Picks the model with the best **PR-AUC** on the validation set, then picks the alert threshold that costs least on the validation set. Each alert costs a fixed review fee, 10 in the dataset's currency by default (`--review-cost`), and each fraud the model misses costs its full amount. `--threshold-rule f1` picks the threshold with the best F1 instead, as earlier versions did.
 6. Scores the untouched test set once and writes the results to `ml/artifacts/<format>/`:
    - `model.joblib` (the saved pipeline, not committed) and `model_meta.json`
    - `metrics.json` and `comparison.txt`
@@ -266,7 +266,7 @@ Before running anywhere other than your own machine:
 pytest
 ```
 
-There are 118 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
+There are 122 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
 
 ## Project layout
 

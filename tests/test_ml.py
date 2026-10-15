@@ -8,7 +8,7 @@ from ml.predict import FraudModel
 from ml.datasets import LABEL
 from ml.preprocess import load_data, split_data, split_with_test_file
 from ml.sample_data import make_paysim_sample, make_sample, make_sparkov_sample
-from ml.evaluate import best_f1_threshold
+from ml.evaluate import alert_costs, best_f1_threshold, min_cost_threshold
 from ml.train import train
 
 
@@ -93,12 +93,50 @@ def test_best_f1_threshold_separates_perfect_scores():
     assert 0.3 < t <= 0.8
 
 
+def test_cost_threshold_flags_fraud_worth_more_than_its_review():
+    y = np.array([0, 1, 0, 1, 0])
+    scores = np.array([0.1, 0.4, 0.5, 0.8, 0.9])
+    amounts = np.array([5, 1000, 5, 3, 5])
+    # Reviews cost 10: flagging down to 0.4 costs 4 reviews (40) but saves the 1,000 fraud.
+    assert min_cost_threshold(y, scores, amounts, review_cost=10) == 0.4
+    # Reviews cost 2,000: nothing is worth flagging, so the cut-off sits above every score.
+    assert min_cost_threshold(y, scores, amounts, review_cost=2000) > 0.9
+
+
+def test_cost_threshold_never_splits_tied_scores():
+    y = np.array([1, 0, 0, 0])
+    scores = np.array([0.7, 0.7, 0.7, 0.1])
+    amounts = np.array([100, 1, 1, 1])
+    t = min_cost_threshold(y, scores, amounts, review_cost=10)
+    assert t == 0.7  # all three tied rows are flagged together: 30 in reviews beats 100 missed
+
+
+def test_alert_costs_add_missed_fraud_and_reviews():
+    c = alert_costs([1, 1, 0, 0], [1, 0, 1, 0], [50, 70, 9, 9], review_cost=10)
+    assert c == {"review_cost": 10, "alerts": 2, "fraud_caught_amount": 50.0,
+                 "fraud_missed_amount": 70.0, "total_cost": 90.0}
+
+
+def test_train_records_the_threshold_rule_and_its_cost(sample_csv, tmp_path):
+    train(sample_csv, out_dir=tmp_path, threshold_rule="f1", review_cost=5)
+    meta = json.loads((tmp_path / "model_meta.json").read_text())
+    metrics = json.loads((tmp_path / "metrics.json").read_text())
+    assert meta["threshold_rule"] == "f1" and meta["review_cost"] == 5
+    assert meta["threshold"] == metrics["test"][meta["model_name"]]["threshold"]
+    assert metrics["other_threshold_rule"]["rule"] == "cost"
+    assert "total_cost" in metrics["test"][meta["model_name"]]["cost"]
+    assert "lowest cost" in (tmp_path / "comparison.txt").read_text()
+    with pytest.raises(ValueError, match="threshold_rule"):
+        train(sample_csv, out_dir=tmp_path, threshold_rule="accuracy")
+
+
 def test_train_saves_model_that_scores_new_rows(sample_csv, tmp_path):
     best_name, val_results, test_results = train(sample_csv, out_dir=tmp_path)
     assert set(val_results) == {"Logistic Regression", "Decision Tree", "Random Forest", "SVM (linear)", "Gradient Boosting"}
     for name in ("model.joblib", "model_meta.json", "metrics.json", "pr_curves.png", "confusion_matrix.png"):
         assert (tmp_path / name).exists()
-    assert json.loads((tmp_path / "model_meta.json").read_text())["split"] == "time"
+    meta = json.loads((tmp_path / "model_meta.json").read_text())
+    assert meta["split"] == "time" and meta["threshold_rule"] == "cost"
     # The fake data has a clear fraud pattern, so the chosen model should find most of it.
     assert test_results[best_name]["recall"] > 0.7
 

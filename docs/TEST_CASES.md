@@ -15,6 +15,10 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | ML-04c | Sparkov's separate test file | Validation is the latest 25% of the training file; the test file is used as it is | `test_sparkov_validation_is_the_latest_part_of_the_training_file` |
 | ML-04d | Random split (`--random-split`, for comparison) | Splits don't overlap and each keeps the fraud rate | `test_random_split_is_stratified_and_disjoint` |
 | ML-05 | Threshold choice | Threshold separates fraud from non-fraud when the scores allow it | `test_best_f1_threshold_separates_perfect_scores` |
+| ML-05a | Cost-based threshold | Flags down to a large fraud when reviews are cheap; flags nothing when reviews cost more than any fraud | `test_cost_threshold_flags_fraud_worth_more_than_its_review` |
+| ML-05b | Tied scores at the cost cut-off | Tied rows are flagged together | `test_cost_threshold_never_splits_tied_scores` |
+| ML-05c | Cost of a threshold | Missed fraud amount plus review cost per alert | `test_alert_costs_add_missed_fraud_and_reviews` |
+| ML-05d | Training with `--threshold-rule f1` | Rule and review cost saved; the other rule's result is reported; an unknown rule is refused | `test_train_records_the_threshold_rule_and_its_cost` |
 | ML-06 | Full training run | Four models compared, model and reports saved, best model finds over 70% of fraud in the test data, split recorded as "time" | `test_train_saves_model_that_scores_new_rows` |
 
 ## 2. Login and roles (`tests/test_api.py`, `tests/test_pages.py`, `tests/test_security.py`)

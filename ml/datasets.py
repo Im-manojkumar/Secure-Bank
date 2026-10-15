@@ -55,6 +55,7 @@ class Profile:
     fields = []                # raw inputs: required in a file, stored with each transaction
     optional = []              # raw columns stored when a file has them, never model inputs
     readable = True            # False when the inputs have no plain meaning (anonymised)
+    amount_feature = "amount"  # model input holding the transaction amount, for costs
 
     @property
     def required_columns(self):
@@ -204,6 +205,7 @@ class CreditCard(Profile):
     description = ("European card payments from September 2013. V1 to V28 are anonymised, "
                    "so explanations name the column but not its meaning.")
     currency = "EUR"
+    amount_feature = "Amount"
     target = "Class"
     readable = False
     fields = (
