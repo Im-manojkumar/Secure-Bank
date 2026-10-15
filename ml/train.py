@@ -41,7 +41,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.svm import LinearSVC
 from sklearn.tree import DecisionTreeClassifier
 
-from ml.datasets import DEFAULT_PROFILE, PROFILES, get_profile
+from ml.datasets import DEFAULT_PROFILE, LABEL, PROFILES, get_profile
 from ml.evaluate import (
     best_f1_threshold,
     min_cost_threshold,
@@ -117,6 +117,29 @@ def limit_training_rows(X, y, max_rows, random_state=RANDOM_STATE):
     return X.loc[keep], y.loc[keep]
 
 
+def add_reviewed_rows(profile, X_train, y_train, reviewed, held_out, history):
+    """Append analyst-reviewed rows to the training set. Returns (X, y, counts).
+
+    A reviewed row whose inputs match a validation or test row is dropped:
+    training on it would let the model see the answers it is graded on.
+    """
+    fields = profile.field_names
+    held = set(pd.util.hash_pandas_object(held_out[fields], index=False))
+    overlap = pd.util.hash_pandas_object(reviewed[fields], index=False).isin(held).to_numpy()
+    keep = reviewed[~overlap].reset_index(drop=True)
+    counts = {"fraud": int((keep[LABEL] == 1).sum()), "legitimate": int((keep[LABEL] == 0).sum()),
+              "dropped_as_validation_or_test": int(overlap.sum())}
+    print(f"Adding {len(keep):,} analyst-reviewed rows to training ({counts['fraud']:,} fraud, "
+          f"{counts['legitimate']:,} legitimate); {counts['dropped_as_validation_or_test']:,} skipped "
+          "because they are validation or test rows.")
+    if not len(keep):
+        return X_train, y_train, counts
+    X_extra = profile.features(keep, history=history)
+    X_extra.index = pd.RangeIndex(len(keep)).map(lambda i: f"reviewed-{i}")
+    y_extra = pd.Series(keep[LABEL].astype(int).to_numpy(), index=X_extra.index, name=y_train.name)
+    return pd.concat([X_train, X_extra]), pd.concat([y_train, y_extra]), counts
+
+
 def threshold_comparison(model_name, rule, chosen, other_rule, other):
     """Plain-text lines comparing the saved threshold with the other rule's, on the test set."""
     names = {"cost": "lowest cost", "f1": "best F1"}
@@ -134,7 +157,14 @@ def threshold_comparison(model_name, rule, chosen, other_rule, other):
 
 def train(data_path=DEFAULT_DATA_PATH, use_smote=True, out_dir=None, dataset=DEFAULT_PROFILE,
           test_path=None, max_train_rows=None, by_time=True, threshold_rule="cost",
-          review_cost=REVIEW_COST):
+          review_cost=REVIEW_COST, reviewed=None):
+    """Train, compare and save. Returns (best model name, validation results, test results).
+
+    reviewed: cleaned rows with an analyst's verdict in LABEL (see
+    services/feedback.py). They are added to the training set only, never
+    to validation or test, and any that are also validation or test rows
+    are dropped so the scores stay honest.
+    """
     if threshold_rule not in THRESHOLD_RULES:
         raise ValueError(f"threshold_rule must be one of {', '.join(THRESHOLD_RULES)}")
     profile = get_profile(dataset)
@@ -142,16 +172,23 @@ def train(data_path=DEFAULT_DATA_PATH, use_smote=True, out_dir=None, dataset=DEF
     out_dir.mkdir(parents=True, exist_ok=True)
 
     df = load_data(data_path, dataset)
+    test_df = load_data(test_path, dataset) if test_path else None
     if test_path:
         X_train, X_val, X_test, y_train, y_val, y_test = split_with_test_file(
-            df, load_data(test_path, dataset), dataset, RANDOM_STATE, by_time
+            df, test_df, dataset, RANDOM_STATE, by_time
         )
+        held_out = pd.concat([df.loc[X_val.index], test_df])
     else:
         X_train, X_val, X_test, y_train, y_val, y_test = split_data(df, dataset, RANDOM_STATE, by_time)
-    del df
+        held_out = df.loc[X_val.index.append(X_test.index)]
     print(f"Train {len(X_train):,} / validation {len(X_val):,} / test {len(X_test):,} rows")
     rows = {"train": len(X_train), "validation": len(X_val), "test": len(X_test)}
     X_train, y_train = limit_training_rows(X_train, y_train, max_train_rows)
+
+    review_counts = None
+    if reviewed is not None and len(reviewed):
+        X_train, y_train, review_counts = add_reviewed_rows(profile, X_train, y_train, reviewed, held_out, df)
+    del df, test_df, held_out
 
     val_amounts = X_val[profile.amount_feature].to_numpy()
     test_amounts = X_test[profile.amount_feature].to_numpy()
@@ -199,7 +236,8 @@ def train(data_path=DEFAULT_DATA_PATH, use_smote=True, out_dir=None, dataset=DEF
         "smote": use_smote,
         "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "split": "time" if by_time else "random",
-        "rows": rows | ({"train_used": len(X_train)} if len(X_train) < rows["train"] else {}),
+        "rows": rows | ({"train_used": len(X_train)} if len(X_train) != rows["train"] else {}),
+        "reviewed_cases": review_counts,
         "threshold_rule": threshold_rule,
         "review_cost": review_cost,
         "selection": "highest validation PR-AUC; threshold "

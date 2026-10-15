@@ -194,6 +194,53 @@ def register_commands(app):
         db.session.commit()
         click.echo(f"Created {role} {email}")
 
+    @app.cli.command("retrain")
+    @click.option("--dataset", required=True, help="Format to retrain: creditcard, sparkov or paysim")
+    @click.option("--data", "data_path", required=True, type=click.Path(exists=True, dir_okay=False),
+                  help="The original training CSV")
+    @click.option("--test-data", type=click.Path(exists=True, dir_okay=False), help="Separate test CSV (Sparkov)")
+    @click.option("--max-train-rows", type=int, help="Cap on training rows, as in python -m ml.train")
+    def retrain(dataset, data_path, test_data, max_train_rows):
+        """Retrain a model with the analysts' case decisions added to its training data.
+
+        The current model is kept in a previous/ folder so it can be put back.
+        Restart the app afterwards to load the new model.
+        """
+        import shutil
+
+        from ml.datasets import get_profile
+        from ml.train import train
+        from services.feedback import reviewed_cases
+
+        try:
+            get_profile(dataset)
+        except ValueError as exc:
+            raise click.ClickException(str(exc))
+        reviewed = reviewed_cases(dataset)
+        click.echo(f"{len(reviewed):,} resolved cases with a verdict for {dataset}.")
+
+        model_dir = Path(app.config["MODEL_DIR"]) / dataset
+        meta_path = model_dir / "model_meta.json"
+        if meta_path.exists():
+            import json
+
+            stamp = json.loads(meta_path.read_text())["trained_at"].replace(":", "-")
+            backup = model_dir / "previous" / stamp
+            backup.mkdir(parents=True, exist_ok=True)
+            for item in model_dir.iterdir():
+                if item.is_file():
+                    shutil.copy2(item, backup / item.name)
+            click.echo(f"Kept the current model in {backup}")
+
+        best, _, test_results = train(data_path, dataset=dataset, test_path=test_data,
+                                      max_train_rows=max_train_rows, out_dir=model_dir, reviewed=reviewed)
+        audit.record("model_retrained", subject=f"model:{dataset}", details={
+            "model": best, "reviewed_cases": len(reviewed),
+            "test_pr_auc": test_results[best]["pr_auc"],
+        })
+        db.session.commit()
+        click.echo("Restart the app to start scoring with the new model.")
+
     @app.cli.command("import-csv")
     @click.argument("path", type=click.Path(exists=True, dir_okay=False))
     def import_csv(path):

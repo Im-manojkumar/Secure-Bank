@@ -23,6 +23,7 @@ ACTIONS = (
     "report_saved",
     "report_deleted",
     "report_exported",
+    "model_retrained",
 )
 
 # Failed logins allowed per email and IP address within the window before blocking.

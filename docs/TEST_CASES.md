@@ -109,6 +109,15 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | DS-19 | Import a Sparkov file in two parts | Every payment stored with its card ID; the second part finds the first part's payments as history | `test_import_compares_payments_with_the_card_history_already_stored` |
 | DS-20 | `init-db` on a database from before `card_id` existed | Column and index added; running again changes nothing | `test_init_db_adds_columns_missing_from_an_older_database` |
 
+## 7a. Learning from analysts (`tests/test_feedback.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| FB-01 | Cases resolved as Confirmed fraud and Legitimate | Returned as rows labelled 1 and 0 with their inputs; other formats not mixed in | `test_resolved_cases_become_labelled_rows` |
+| FB-02 | Reviewed rows that include test rows | Test rows dropped and counted; the rest added to training only | `test_reviewed_rows_join_training_but_never_validation_or_test` |
+| FB-03 | `flask retrain` | Old model copied to `previous/`, new model records its reviewed cases, retrain audited | `test_retrain_command_keeps_the_old_model_and_logs_it` |
+| FB-04 | `flask retrain` with an unknown format | Refused with a clear message | `test_retrain_rejects_an_unknown_format` |
+
 ## 8. Saved reports and CSV downloads (`tests/test_reports.py`)
 
 | ID | Case | Expected result | Test |
