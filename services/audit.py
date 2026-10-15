@@ -26,6 +26,8 @@ ACTIONS = (
     "model_retrained",
     "api_key_created",
     "api_key_revoked",
+    "two_factor_enabled",
+    "two_factor_disabled",
 )
 
 # Failed logins allowed per email and IP address within the window before blocking.

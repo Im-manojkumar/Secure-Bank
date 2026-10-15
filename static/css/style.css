@@ -232,3 +232,11 @@ td.wrap { white-space: normal; min-width: 260px; }
 .report-filters { color: var(--text-2); margin: 4px 0 0; }
 .report-body { grid-template-columns: minmax(0, 2fr) minmax(240px, 1fr); margin-bottom: 16px; }
 @media (max-width: 800px) { .report-body { grid-template-columns: minmax(0, 1fr); } }
+
+/* Account page */
+.narrow { max-width: 640px; }
+.input-small { max-width: 10rem; }
+.hint { color: var(--text-2); font-size: 0.9em; }
+code.secret { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; background: var(--surface-2); padding: 1px 6px; border-radius: 4px; }
+.user a.user-email { text-decoration: none; }
+.user a.user-email:hover, .user a.user-email[aria-current="page"] { text-decoration: underline; }

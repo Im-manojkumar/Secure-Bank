@@ -226,9 +226,12 @@ Every endpoint except login and the live scoring API needs a logged-in session c
 
 | Method and path | Who | What it does |
 |---|---|---|
-| `POST /api/auth/login` | anyone | Log in with JSON `{"email", "password"}` |
+| `POST /api/auth/login` | anyone | Log in with JSON `{"email", "password"}`, plus `"code"` once two-factor login is on. Without the code the answer is 401 with `"two_factor_required": true` |
 | `POST /api/auth/logout` | logged in | Log out |
 | `GET /api/auth/me` | logged in | The current user |
+| `POST /api/auth/2fa/setup` | logged in | Start two-factor setup: returns a new secret and its `otpauth://` link |
+| `POST /api/auth/2fa/enable` | logged in | Finish setup with `{"code"}` from the app |
+| `POST /api/auth/2fa/disable` | logged in, not a required admin | Turn it off with `{"password", "code"}` |
 | `POST /api/transactions/import` | admin | Upload a CSV as form field `file`; the format is detected from its columns |
 | `GET /api/sources` | logged in | Past imports and their results |
 | `GET /api/transactions` | logged in | Search, with filters `dataset`, `source_id`, `date_from`, `date_to`, `min_amount`, `max_amount`, `prediction` (`suspicious` or `low_risk`) and `status` |
@@ -279,6 +282,7 @@ curl -b cookies.txt -X PATCH -H "Content-Type: application/json" \
 The main protections are:
 - **Passwords:** stored as salted scrypt hashes.
 - **Login limit:** 5 failed logins per email and IP address in 15 minutes.
+- **Two-factor login:** a 6-digit code from an authenticator app after the password. Admins must set it up on the Account page (click your email at the top right) before they can use anything else; analysts can turn it on there. Codes follow RFC 6238, accept one 30-second step of clock difference, and cannot be used twice. `REQUIRE_2FA_FOR_ADMINS=0` turns the admin requirement off for local experiments.
 - **Roles:** checked on every route.
 - **Cross-site requests:** blocked by `SameSite` cookies and an `Origin` check.
 - **Scripts and styles:** a strict Content-Security-Policy, with no inline scripts or styles on any page.
@@ -299,7 +303,7 @@ Before running anywhere other than your own machine:
 pytest
 ```
 
-There are 141 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
+There are 147 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
 
 ## Project layout
 

@@ -34,6 +34,12 @@ def dashboard():
     return render_template("dashboard.html", active="dashboard")
 
 
+@bp.get("/account")
+@login_required
+def account():
+    return render_template("account.html", active="account")
+
+
 @bp.get("/transactions")
 @login_required
 def transactions():

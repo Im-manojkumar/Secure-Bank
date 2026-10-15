@@ -21,6 +21,7 @@ SB.api = async function (path, options = {}) {
   if (!response.ok) {
     const error = new Error((body && body.error) || `Request failed (${response.status})`);
     error.details = body && body.details;
+    error.data = body || {};
     error.status = response.status;
     throw error;
   }

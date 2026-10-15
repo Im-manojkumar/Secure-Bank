@@ -138,6 +138,17 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | LV-06 | Unknown format, negative amount, card number with dashes | 400 with the problems listed | `test_bad_requests_are_explained` |
 | LV-07 | `create-api-key`, then `revoke-api-key` | Key printed once, only its hash stored, revoked; both audited | `test_api_keys_are_made_and_revoked_from_the_command_line` |
 
+## 7d. Two-factor login (`tests/test_two_factor.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| TF-01 | Codes for RFC 6238's test secret | Match the RFC's published codes | `test_codes_match_the_rfc_test_vectors` |
+| TF-02 | A code used twice, one step late, three steps late, 5 digits | Accepted once; refused again; accepted; refused; refused | `test_a_code_works_once_within_its_window` |
+| TF-03 | Setup with a wrong code | Refused; two-factor stays off | `test_setup_needs_a_correct_code` |
+| TF-04 | Log in with two-factor on: no code, wrong code, right code | Asked for the code without logging in; failed login audited; logged in | `test_login_asks_for_the_code_once_it_is_on` |
+| TF-05 | Admin without two-factor when it is required | API 403 and pages redirect to Account until set up; cannot turn it off afterwards | `test_admins_must_set_it_up_before_anything_else` |
+| TF-06 | Analyst turns it off | Needs the right password and a code; both changes audited | `test_analyst_can_turn_it_off_with_password_and_code` |
+
 ## 8. Saved reports and CSV downloads (`tests/test_reports.py`)
 
 | ID | Case | Expected result | Test |
@@ -157,6 +168,7 @@ All of these run automatically with `pytest`, locally and on every push and pull
 
 ## 9. Manual checks in a browser
 
+
 These were run in Chromium against the full Kaggle dataset (283,726 transactions).
 
 | ID | Steps | Expected result |
@@ -175,3 +187,5 @@ These were run in Chromium against the full Kaggle dataset (283,726 transactions
 | UI-12 | Search Sparkov, Suspicious, Min amount 500, save it as "Large Sparkov alerts", then open it from Reports (1.1 million transactions imported) | 1,156 transactions, all suspicious, $1,079,813.90; opens in well under a second |
 | UI-13 | On that report, click Download CSV, then Open in Transactions | `securebank-large-sparkov-alerts.csv` with 1,156 rows; the Transactions page opens with the same filters filled in |
 | UI-14 | Click Download CSV on Transactions with no filters | "This matches 1,139,445 transactions. Narrow the filters…", and no file is saved |
+
+Two-factor login was checked in Chromium: an admin without it lands on the Account page and is sent back there from other pages; after adding the key to an app and entering a code, the dashboard opens; on the next login the page asks for the code and then logs in.
