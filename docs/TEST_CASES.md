@@ -94,8 +94,26 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | DS-12 | Check a Sparkov transaction | Result plus the reasons for its score | `test_predict_with_a_dataset_explains_the_score` |
 | DS-13 | Check with bad values in each format | 400 listing each problem; unknown format refused | `test_predict_validates_each_format`, `test_transaction_filter_rejects_unknown_dataset` |
 | DS-14 | Dashboard with euro and dollar imports | Flagged amounts totalled per currency, never mixed | `test_dashboard_totals_flagged_amounts_per_currency` |
+| DS-15 | Dashboard and alerts limited to one format, by day or by hour | Totals, cases, trend and alerts cover only that format; an unknown format gives 400 | `test_dashboard_and_alerts_filter_by_dataset` |
 
-## 8. Manual checks in a browser
+## 8. Saved reports and CSV downloads (`tests/test_reports.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| RP-01 | Save "suspicious Sparkov" as a report | Unknown and empty filters dropped; totals, amounts, currency and open cases match the same search | `test_saved_report_totals_match_the_search` |
+| RP-02 | Resolve a case as confirmed fraud, then open the report | The report shows the new status and outcome, because it is run again each time | `test_report_reflects_case_reviews` |
+| RP-03 | Report with no filters | Covers every transaction, in every format | `test_report_with_no_filters_covers_everything` |
+| RP-04 | Blank or 121-character name, bad amount, unknown case status, filters not an object | 400 with a message | `test_report_validation` |
+| RP-05 | Two reports named "Weekly" and "weekly" | Second one refused with 409 | `test_report_names_are_unique` |
+| RP-06 | Analyst deletes an admin's report, then their own; admin deletes theirs | 403, then 204, then 204 | `test_only_the_owner_or_an_admin_can_delete` |
+| RP-07 | Download a report | CSV named after the report, one row per match, with dataset, currency, case status and top reason, and no personal data | `test_report_downloads_as_csv` |
+| RP-08 | Download the current transaction search | Only matching rows; an unknown format gives 400 | `test_search_downloads_as_csv` |
+| RP-09 | Import a file named `=HYPERLINK(evil).csv`, then download | The cell starts with `'`, so spreadsheets show it as text instead of running it | `test_csv_cells_cannot_run_as_formulas` |
+| RP-10 | Download more rows than `EXPORT_MAX_ROWS` | Refused with the row count; saving, deleting and each real download are in the audit log, but refused downloads are not | `test_downloads_are_limited_and_audited` |
+| RP-11 | Reports and downloads without logging in | 401 | `test_reports_need_a_login` |
+| RP-12 | Database file in use | Runs in write-ahead-log mode, so long reads don't block logins | `test_file_databases_use_write_ahead_logging` |
+
+## 9. Manual checks in a browser
 
 These were run in Chromium against the full Kaggle dataset (283,726 transactions).
 
@@ -112,3 +130,6 @@ These were run in Chromium against the full Kaggle dataset (283,726 transactions
 | UI-09 | Repeat UI-01 with the system set to dark mode | Readable dark theme |
 | UI-10 | Use a 390 px wide phone screen | No sideways scrolling, and the menu scrolls on one line |
 | UI-11 | Watch the browser console on every page | No script errors and no Content-Security-Policy violations |
+| UI-12 | Search Sparkov, Suspicious, Min amount 500, save it as "Large Sparkov alerts", then open it from Reports (1.1 million transactions imported) | 1,156 transactions, all suspicious, $1,079,813.90; opens in well under a second |
+| UI-13 | On that report, click Download CSV, then Open in Transactions | `securebank-large-sparkov-alerts.csv` with 1,156 rows; the Transactions page opens with the same filters filled in |
+| UI-14 | Click Download CSV on Transactions with no filters | "This matches 1,139,445 transactions. Narrow the filters…", and no file is saved |

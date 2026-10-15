@@ -142,7 +142,7 @@ def test_security_headers(client):
 
 
 @pytest.mark.parametrize("path", ["/login", "/", "/transactions", "/transactions/1", "/alerts", "/cases/1",
-                                  "/predict", "/import", "/audit"])
+                                  "/predict", "/import", "/audit", "/reports", "/reports/1"])
 def test_pages_have_no_inline_scripts_or_styles(admin, path):
     html = admin.get(path).get_data(as_text=True) if path != "/login" else admin.application.test_client().get(path).get_data(as_text=True)
     assert not re.search(r"<script(?![^>]*\bsrc=)[^>]*>", html), "inline <script> would be blocked by the CSP"
@@ -159,3 +159,16 @@ def test_admin_sees_audit_page(admin):
     response = admin.get("/audit")
     assert response.status_code == 200
     assert b'href="/audit"' in response.data
+
+
+def test_file_databases_use_write_ahead_logging(model_dir, tmp_path):
+    from app import create_app
+    from config import TestConfig
+
+    class Config(TestConfig):
+        MODEL_DIR = model_dir
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{tmp_path / 'wal.db'}"
+
+    with create_app(Config).app_context():
+        with db.engine.connect() as conn:
+            assert conn.exec_driver_sql("PRAGMA journal_mode").scalar() == "wal"

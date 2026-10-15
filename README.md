@@ -11,6 +11,7 @@ This repository is built in stages:
 3. **Dashboard and case review** (done): fraud statistics, transaction search, alerts and investigation notes.
 4. **Testing, security and documentation** (done): audit log, login limits, CSRF and CSP protection, automated tests on GitHub, and architecture and test-case docs.
 5. **More datasets and explanations** (done): separate models for the Sparkov and PaySim datasets, gradient boosting as a fifth model, and the reasons behind each alert.
+6. **Saved reports** (done): name a transaction search, re-run it with live totals, and download the results as CSV.
 
 ## Setup
 
@@ -161,7 +162,7 @@ Then open http://127.0.0.1:5000 and log in.
 
 Import Sparkov's `fraudTest.csv` or `paysim.csv` the same way. Importing the credit card file takes about a minute and makes a database of about 350 MB in `instance/securebank.db`, which is not committed. Importing the same rows again skips them as duplicates.
 
-A database created before step 5 lacks the new `dataset` and `explanation` columns. Delete `instance/securebank.db` and run `init-db` again, because `init-db` only creates missing tables, not missing columns.
+A database created before step 5 lacks the new `dataset` and `explanation` columns. Delete `instance/securebank.db` and run `init-db` again, because `init-db` only creates missing tables, not missing columns. A step 5 database only needs `init-db` run again to add the saved reports table.
 
 There are two roles. An **admin** can do everything, including importing files. An **analyst** can search transactions, run predictions and review fraud cases.
 
@@ -178,8 +179,9 @@ There are two roles. An **admin** can do everything, including importing files. 
 | Page | What it shows |
 |---|---|
 | Dashboard (`/`) | Totals, the fraud rate, cases waiting for review, flagged amounts per currency, transactions and suspicious transactions over time, cases by status, and the highest-risk open alerts, for all data or one format |
-| Transactions (`/transactions`) | Search by format, date, amount, prediction, case status and import, with each result linking to a detail page with the model inputs and why it was flagged |
+| Transactions (`/transactions`) | Search by format, date, amount, prediction, case status and import, with each result linking to a detail page with the model inputs and why it was flagged. Save the search as a report, or download it as CSV |
 | Alerts (`/alerts`) | Fraud cases, highest risk first, with tabs for Open, Under review, Resolved and All |
+| Reports (`/reports`) | Searches the team has saved. Opening one runs it again and shows its totals per format, its fraud cases and their outcomes, with a CSV download |
 | Case (`/cases/<id>`) | The flagged transaction, why it was flagged, and a review form for status, outcome and investigation notes |
 | Check a transaction (`/predict`) | Pick a format, score any set of values and see what raised the score, or start from an imported transaction and change it |
 | Import (`/import`, admins only) | Upload a CSV with a progress bar, and see the history of past imports |
@@ -192,6 +194,8 @@ There are two roles. An **admin** can do everything, including importing files. 
 | ![Alerts](docs/screenshots/alerts.png) | ![Case review](docs/screenshots/case.png) | ![Check a transaction](docs/screenshots/predict.png) |
 
 ![Transaction detail with why it was flagged](docs/screenshots/transaction.png)
+
+![A saved report](docs/screenshots/report.png)
 
 The pages are plain HTML, CSS and JavaScript with no build step and no external libraries. Each page fetches its data from the JSON API below, and the charts are drawn as SVG. Light and dark mode follow the system setting, and the layout works on phone screens.
 
@@ -212,6 +216,12 @@ Every endpoint except login needs a logged-in session cookie. Errors come back a
 | `POST /api/predict` | logged in | Score one transaction sent as JSON, without saving it. `dataset` picks the format (default `creditcard`); the other keys are that format's input fields. The answer includes the explanation |
 | `GET /api/alerts` | logged in | Fraud cases with the highest risk first, optionally filtered with `?status=Open` and `?dataset=sparkov` |
 | `GET /api/cases/<id>` | logged in | One fraud case |
+| `GET /api/reports` | logged in | Saved reports, newest first |
+| `POST /api/reports` | admin, analyst | Save a search as JSON `{"name", "filters"}`, where `filters` takes the same keys as `/api/transactions` |
+| `GET /api/reports/<id>` | logged in | A report with its current totals per format, case counts and outcomes |
+| `DELETE /api/reports/<id>` | owner or admin | Delete a report; the transactions are not affected |
+| `GET /api/reports/<id>/export` | logged in | Download a report's transactions as CSV, at most `EXPORT_MAX_ROWS` (100,000) rows |
+| `GET /api/transactions/export` | logged in | Download a search as CSV, with the same filters as `/api/transactions`. Add `check=1` to only ask whether it is within the limit |
 | `PATCH /api/cases/<id>` | admin, analyst | Update `status` (`Open`, `Under Review` or `Resolved`), `review_notes` and `outcome` (`Confirmed fraud` or `Legitimate`, required to resolve a case) |
 | `GET /api/audit` | admin | Audit log, newest first, with filters `action` and `subject` |
 | `GET /api/dashboard/summary` | logged in | Totals, predicted fraud, flagged amounts per currency, cases by status and a trend by day, or by hour with `?granularity=hour`; `?dataset=` limits it to one format |
@@ -236,7 +246,8 @@ The main protections are:
 - **Roles:** checked on every route.
 - **Cross-site requests:** blocked by `SameSite` cookies and an `Origin` check.
 - **Scripts and styles:** a strict Content-Security-Policy, with no inline scripts or styles on any page.
-- **Audit log:** every sensitive action is recorded.
+- **Audit log:** every sensitive action is recorded, including every CSV download.
+- **CSV downloads:** cells that a spreadsheet would run as a formula are made plain text, and downloads are capped at 100,000 rows.
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#security) lists each risk, how it is handled, and the known limits.
 
@@ -251,7 +262,7 @@ Before running anywhere other than your own machine:
 pytest
 ```
 
-There are 92 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, and each dataset format with its explanations.
+There are 114 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
 
 ## Project layout
 
@@ -259,10 +270,10 @@ There are 92 tests, which run on GitHub for every push and pull request. They us
 app.py            Flask app factory and CLI commands (init-db, create-user, import-csv)
 config.py         settings, overridable with environment variables
 models.py         database tables
-routes/           API endpoints (auth, transactions, alerts, dashboard) and HTML pages (pages.py)
+routes/           API endpoints (auth, transactions, alerts, reports, dashboard, audit) and HTML pages (pages.py)
 templates/        Jinja page templates
 static/           CSS and JavaScript for the pages
-services/         import, prediction and case logic used by the routes
+services/         import, prediction, search and case logic used by the routes
 ml/
   datasets.py     the three formats: columns, cleaning and model inputs
   preprocess.py   load, validate and split a dataset

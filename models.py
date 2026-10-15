@@ -202,6 +202,33 @@ class FraudCase(db.Model):
         return data
 
 
+class SavedReport(db.Model):
+    """A named transaction search that anyone on the team can run again.
+
+    Only the filters are stored, so a report always shows the current data.
+    """
+
+    __tablename__ = "saved_reports"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    # The same filters /api/transactions takes, e.g. {"dataset": "sparkov", "prediction": "suspicious"}.
+    filters = db.Column(JSON, nullable=False)
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+
+    owner = db.relationship("User")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
+            "filters": self.filters,
+            "created_by": self.owner.email if self.owner else None,
+            "created_at": self.created_at.isoformat(),
+        }
+
+
 class AuditLog(db.Model):
     """Who did what and when, for sensitive actions. Rows are only ever added."""
 

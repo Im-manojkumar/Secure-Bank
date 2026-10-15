@@ -22,9 +22,18 @@
     return params;
   }
 
+  function currentFilters() {
+    const filters = {};
+    for (const element of form.elements) {
+      if (element.name && element.value) filters[element.name] = element.value;
+    }
+    return filters;
+  }
+
   async function load(page = 1, pushState = true) {
     const params = query(page);
     if (pushState) history.replaceState(null, "", `?${params}`);
+    document.getElementById("download-csv").href = `/api/transactions/export?${SB.filterQuery(currentFilters())}`;
     params.set("per_page", 25);
     SB.message(errorBox, "");
     try {
@@ -59,6 +68,24 @@
     } catch (e) { /* the filter is optional */ }
   }
 
+  const saveForm = document.getElementById("save-report");
+  const saveMessage = document.getElementById("save-message");
+  saveForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    try {
+      const { report } = await SB.api("/api/reports", {
+        method: "POST", json: { name: document.getElementById("report-name").value, filters: currentFilters() },
+      });
+      saveForm.reset();
+      saveMessage.replaceChildren("Saved. ", SB.el("a", { href: `/reports/${report.id}` }, `Open “${report.name}”`));
+      saveMessage.className = "message message-success";
+      saveMessage.hidden = false;
+    } catch (error) {
+      SB.message(saveMessage, error.message);
+    }
+  });
+
+  SB.guardDownload(document.getElementById("download-csv"), saveMessage);
   form.addEventListener("submit", (e) => { e.preventDefault(); load(1); });
   form.addEventListener("reset", () => setTimeout(() => load(1), 0));
 

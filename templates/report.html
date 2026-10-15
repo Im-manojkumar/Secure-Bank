@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Report{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('pages.reports') }}">← All reports</a></p>
+<div class="page-head">
+  <div>
+    <h1 id="page-title" data-id="{{ report_id }}">Report</h1>
+    <p class="report-filters" id="report-filters">&nbsp;</p>
+    <p class="muted" id="report-meta">&nbsp;</p>
+  </div>
+  <div class="actions">
+    <a class="btn" id="report-open" href="#">Open in Transactions</a>
+    <a class="btn btn-primary" id="report-download" href="#" download>Download CSV</a>
+    <button class="btn" type="button" id="report-delete" hidden>Delete</button>
+  </div>
+</div>
+<p id="report-error" role="alert" hidden></p>
+
+<section class="grid tiles" aria-label="Key numbers">
+  <div class="card"><p class="tile-label">Transactions</p><p class="tile-value" id="r-total">–</p><p class="tile-sub">match the filters</p></div>
+  <div class="card"><p class="tile-label">Flagged as suspicious</p><p class="tile-value" id="r-flagged">–</p><p class="tile-sub" id="r-rate">&nbsp;</p></div>
+  <div class="card"><p class="tile-label">Waiting for review</p><p class="tile-value" id="r-pending">–</p><p class="tile-sub">open or under review</p></div>
+  <div class="card"><p class="tile-label">Confirmed fraud</p><p class="tile-value" id="r-confirmed">–</p><p class="tile-sub" id="r-legit">&nbsp;</p></div>
+</section>
+
+<section class="grid report-body">
+  <div class="card">
+    <h2>By data</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data</th><th class="num">Transactions</th><th class="num">Amount</th><th class="num">Suspicious</th><th class="num">Suspicious amount</th></tr></thead>
+        <tbody id="r-datasets"></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card">
+    <h2>Fraud cases</h2>
+    <dl class="dl" id="r-cases"></dl>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/report.js') }}"></script>
+{% endblock %}

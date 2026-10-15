@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 import click
 from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_login import LoginManager
+from sqlalchemy import event
 from werkzeug.exceptions import HTTPException
 
 from config import Config
@@ -22,6 +23,24 @@ from models import ROLES, User, db
 from services import audit
 
 login_manager = LoginManager()
+
+
+def use_sqlite_wal(engine):
+    """Let pages keep reading while another request writes.
+
+    By default SQLite makes a write wait for every running read, so a slow
+    report over a million rows could make a login fail with "database is
+    locked". Write-ahead logging lets reads and one writer run together.
+    """
+    if engine.dialect.name != "sqlite" or engine.url.database in (None, "", ":memory:"):
+        return
+
+    @event.listens_for(engine, "connect")
+    def set_pragmas(dbapi_connection, _record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA busy_timeout=15000")
+        cursor.close()
 
 
 def create_app(config_class=Config):
@@ -37,11 +56,13 @@ def create_app(config_class=Config):
 
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
     db.init_app(app)
+    with app.app_context():
+        use_sqlite_wal(db.engine)
     login_manager.init_app(app)
 
-    from routes import alerts, audit as audit_routes, auth, dashboard, pages, transactions
+    from routes import alerts, audit as audit_routes, auth, dashboard, pages, reports, transactions
 
-    for module in (auth, transactions, alerts, dashboard, audit_routes, pages):
+    for module in (auth, transactions, alerts, dashboard, reports, audit_routes, pages):
         app.register_blueprint(module.bp)
 
     register_error_handlers(app)

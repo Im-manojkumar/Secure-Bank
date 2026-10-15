@@ -2,7 +2,7 @@ import pytest
 
 from tests.conftest import login
 
-PAGES = ["/", "/transactions", "/transactions/1", "/alerts", "/cases/1", "/predict"]
+PAGES = ["/", "/transactions", "/transactions/1", "/alerts", "/cases/1", "/predict", "/reports", "/reports/1"]
 
 
 @pytest.mark.parametrize("path", PAGES + ["/import"])

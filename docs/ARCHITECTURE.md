@@ -12,7 +12,7 @@ flowchart LR
 
     subgraph Flask app
         R[Routes<br/>routes/*.py]
-        S[Services<br/>ingestion, prediction,<br/>alerts, audit]
+        S[Services<br/>ingestion, prediction,<br/>search, alerts, audit]
         M[Saved models, one per format<br/>ml/artifacts/&lt;dataset&gt;/model.joblib]
     end
 
@@ -33,9 +33,9 @@ flowchart LR
 |---|---|---|
 | Pages | `templates/`, `static/js/`, `static/css/` | Show data and forms. They hold no business logic and only call the API. |
 | Routes | `routes/*.py` | Check login and role, validate input, and return JSON or HTML. |
-| Services | `services/*.py` | Import, scoring, case rules and audit logging, kept out of the routes so they can be tested and reused by the CLI. |
+| Services | `services/*.py` | Import, scoring, search and reports, case rules and audit logging, kept out of the routes so they can be tested and reused by the CLI. |
 | Model | `ml/*.py`, `ml/artifacts/` | Data formats (`datasets.py`), training, evaluation, explanations, and a `FraudModel` class that loads a saved pipeline. |
-| Data | `models.py`, `instance/securebank.db` | Six tables, described below. |
+| Data | `models.py`, `instance/securebank.db` | Seven tables, described below. |
 
 ## What happens when a file is imported
 
@@ -67,6 +67,7 @@ erDiagram
     users ||--o{ data_sources : imports
     users ||--o{ fraud_cases : reviews
     users ||--o{ audit_logs : "acts in"
+    users ||--o{ saved_reports : saves
     data_sources ||--o{ transactions : contains
     transactions ||--|| predictions : "scored as"
     transactions ||--o| fraud_cases : "flagged as"
@@ -110,6 +111,12 @@ erDiagram
         text review_notes
         int reviewed_by
     }
+    saved_reports {
+        int id
+        string name
+        json filters
+        int created_by
+    }
     audit_logs {
         int id
         int user_id
@@ -121,6 +128,8 @@ erDiagram
 ```
 
 The imported record, the model's prediction and the analyst's outcome sit in three separate tables. A reviewer marking a case "Legitimate" never changes what the model predicted, so the two can be compared later. `dataset_label` keeps the Kaggle `Class` value for evaluation only, and the app never uses it to make decisions.
+
+A saved report stores only its name and the search filters, never a copy of the results. Opening it runs the search again (`services/search.py`), so its totals, case counts and CSV download always match the current data.
 
 ## The models
 
@@ -158,7 +167,8 @@ This works the same for every model type, and the typical values are saved in `m
 | Clickjacking, MIME sniffing, caching | `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, and `Cache-Control: no-store` on API responses. | `app.py` (`security_headers`) |
 | Open redirect after login | `?next=` only follows paths on the same site. | `routes/pages.py` (`_safe_next`) |
 | Bad uploads | Files over 200 MB are refused. Files must be CSV with the expected columns, and invalid rows are skipped and counted. | `config.py`, `services/ingestion.py` |
-| Untraceable changes | Logins, failed logins, imports, case changes and new users are written to `audit_logs`, in the same transaction as the change. | `services/audit.py` |
+| Untraceable changes | Logins, failed logins, imports, case changes, new users, and saved, deleted and downloaded reports are written to `audit_logs`, in the same transaction as the change. | `services/audit.py` |
+| Spreadsheet formula injection | Text cells in CSV downloads that start with `=`, `+`, `-` or `@` get a leading `'`, so a spreadsheet shows them instead of running them. Downloads are capped at `EXPORT_MAX_ROWS` (100,000) and each one is audited. | `services/search.py`, `routes/reports.py` |
 | Leaked secrets or data | `SECRET_KEY` comes from the environment. The dataset, database and trained model are git-ignored. | `config.py`, `.gitignore` |
 
 The app never asks for or stores bank passwords, PINs, CVVs, OTPs or access tokens. A real bank integration would go through an authorised provider's API and consent flow, as section 10 of the project spec describes.
