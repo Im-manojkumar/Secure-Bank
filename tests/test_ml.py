@@ -41,7 +41,7 @@ def test_split_is_stratified_and_disjoint(sample_csv):
     assert len(X_train) + len(X_val) + len(X_test) == len(df)
     assert set(X_train.index).isdisjoint(X_test.index)
     assert set(X_val.index).isdisjoint(X_test.index)
-    rate = df["Class"].mean()
+    rate = df["label"].mean()
     for y in (y_train, y_val, y_test):
         assert abs(y.mean() - rate) < 0.01
 
@@ -55,7 +55,7 @@ def test_best_f1_threshold_separates_perfect_scores():
 
 def test_train_saves_model_that_scores_new_rows(sample_csv, tmp_path):
     best_name, val_results, test_results = train(sample_csv, out_dir=tmp_path)
-    assert set(val_results) == {"Logistic Regression", "Decision Tree", "Random Forest", "SVM (linear)"}
+    assert set(val_results) == {"Logistic Regression", "Decision Tree", "Random Forest", "SVM (linear)", "Gradient Boosting"}
     for name in ("model.joblib", "model_meta.json", "metrics.json", "pr_curves.png", "confusion_matrix.png"):
         assert (tmp_path / name).exists()
     # The fake data has a clear fraud pattern, so the chosen model should find most of it.

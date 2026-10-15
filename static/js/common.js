@@ -46,7 +46,10 @@ SB.el = function (tag, attrs = {}, ...children) {
   return node;
 };
 
-SB.money = (n) => (n ?? 0).toLocaleString(undefined, { style: "currency", currency: "EUR" });
+// Amounts carry their dataset's currency; PaySim has none, so it shows a plain number.
+SB.money = (n, currency = "EUR") => currency
+  ? (n ?? 0).toLocaleString(undefined, { style: "currency", currency })
+  : (n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 SB.number = (n) => (n ?? 0).toLocaleString();
 SB.percent = (n, digits = 2) => `${((n ?? 0) * 100).toFixed(digits)}%`;
 SB.score = (n) => (n === null || n === undefined ? "–" : n.toFixed(3));
@@ -71,6 +74,25 @@ SB.statusBadge = function (status) {
 };
 
 SB.outcomeText = (outcome) => outcome || "–";
+
+SB.DATASETS = { creditcard: "Kaggle credit card", sparkov: "Sparkov card payments", paysim: "PaySim mobile money" };
+SB.datasetName = (key) => SB.DATASETS[key] || key || "–";
+
+// A stored input value: numbers to 4 decimal places unless whole, text as is.
+SB.inputValue = (value) => typeof value === "number"
+  ? (Number.isInteger(value) ? value.toLocaleString() : value.toFixed(4))
+  : String(value);
+
+// "Why it was flagged": the inputs that raised the score most, each against a typical genuine value.
+SB.reasons = function (explanation) {
+  if (!explanation || !explanation.length) {
+    return SB.el("p", { class: "muted" }, "No single input stands out; the score comes from several small differences.");
+  }
+  return SB.el("ol", { class: "reasons" }, explanation.map((r) =>
+    SB.el("li", {},
+      SB.el("strong", {}, r.feature), ": ", r.value,
+      SB.el("span", { class: "muted" }, ` (typical ${r.typical}) · +${r.effect.toFixed(3)} to the score`))));
+};
 
 // Show a message in a [role=status] or [role=alert] element.
 SB.message = function (target, text, kind = "error") {

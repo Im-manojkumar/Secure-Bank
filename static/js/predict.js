@@ -1,14 +1,39 @@
 (function () {
   const $ = (id) => document.getElementById(id);
-  const FEATURES = ["Time", ...Array.from({ length: 28 }, (_, i) => `V${i + 1}`), "Amount"];
-  const HELP = { Time: "Seconds since the first transaction", Amount: "Amount in €" };
   const form = $("predict-form");
+  const datasetSelect = $("dataset");
+  let formats = {};
 
-  $("inputs").replaceChildren(...FEATURES.map((name) =>
-    SB.el("div", { class: "feature" },
-      SB.el("label", { for: `in-${name}` }, name),
-      SB.el("input", { id: `in-${name}`, name, type: "number", step: "any", required: true,
-                       min: name === "Amount" || name === "Time" ? 0 : null, title: HELP[name] || null }))));
+  // datetime fields use a datetime-local input, which wants "2019-01-01T00:00:18".
+  const toInput = (field, value) => field.kind === "datetime" ? String(value).replace(" ", "T") : value;
+
+  function inputFor(field) {
+    const id = `in-${field.name}`;
+    let control;
+    if (field.kind === "choice") {
+      control = SB.el("select", { id, name: field.name, required: true },
+        SB.el("option", { value: "" }, "Choose…"),
+        field.options.map((o) => SB.el("option", { value: o.value }, o.label)));
+    } else {
+      const type = { number: "number", date: "date", datetime: "datetime-local" }[field.kind];
+      control = SB.el("input", {
+        id, name: field.name, type, required: true, step: field.kind === "datetime" ? "1" : "any",
+        min: field.minimum ?? null, max: field.maximum ?? null, title: field.help || null,
+      });
+    }
+    return SB.el("div", { class: "feature" }, SB.el("label", { for: id }, field.label), control);
+  }
+
+  function showFields(key) {
+    const format = formats[key];
+    $("inputs").replaceChildren(...format.fields.map(inputFor));
+    $("dataset-help").textContent = format.description;
+    resetResult();
+  }
+
+  function resetResult() {
+    $("result").replaceChildren(SB.el("p", { class: "muted" }, "Fill in the values and press Check."));
+  }
 
   function showResult(r) {
     const max = Math.max(1, r.risk_score, r.threshold);
@@ -24,6 +49,8 @@
         SB.el("dt", {}, "Risk score"), SB.el("dd", {}, SB.score(r.risk_score)),
         SB.el("dt", {}, "Alert threshold"), SB.el("dd", {}, SB.score(r.threshold)),
         SB.el("dt", {}, "Model"), SB.el("dd", {}, r.model_version)),
+      SB.el("h3", { class: "mt-16" }, "What raised the score"),
+      SB.reasons(r.explanation),
       SB.el("p", { class: "muted" }, r.note),
     );
   }
@@ -31,7 +58,15 @@
   async function loadFrom(id) {
     try {
       const { transaction } = await SB.api(`/api/transactions/${id}`);
-      for (const name of FEATURES) form.elements[name].value = transaction.features[name];
+      if (!formats[transaction.dataset]) {
+        SB.message($("load-message"), `No trained model for ${SB.datasetName(transaction.dataset)} data yet.`);
+        return;
+      }
+      datasetSelect.value = transaction.dataset;
+      showFields(transaction.dataset);
+      for (const field of formats[transaction.dataset].fields) {
+        form.elements[field.name].value = toInput(field, transaction.features[field.name]);
+      }
       SB.message($("load-message"), `Loaded transaction #${id}.`, "success");
     } catch (error) {
       SB.message($("load-message"), error.status === 404 ? `Transaction #${id} does not exist.` : error.message);
@@ -43,18 +78,21 @@
     if ($("load-id").value) loadFrom($("load-id").value);
   });
 
+  datasetSelect.addEventListener("change", () => showFields(datasetSelect.value));
+
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
     SB.message($("predict-error"), "");
-    const payload = {};
-    for (const name of FEATURES) {
-      const raw = form.elements[name].value;
+    const format = formats[datasetSelect.value];
+    const payload = { dataset: format.key };
+    for (const field of format.fields) {
+      const raw = form.elements[field.name].value;
       if (raw === "") {
-        SB.message($("predict-error"), `Fill in ${name}.`);
-        form.elements[name].focus();
+        SB.message($("predict-error"), `Fill in ${field.label}.`);
+        form.elements[field.name].focus();
         return;
       }
-      payload[name] = Number(raw);
+      payload[field.name] = field.kind === "number" ? Number(raw) : raw;
     }
     try {
       showResult(await SB.api("/api/predict", { method: "POST", json: payload }));
@@ -63,13 +101,31 @@
     }
   });
 
+  // Reset clears the values but keeps the chosen format.
   form.addEventListener("reset", () => {
-    $("result").replaceChildren(SB.el("p", { class: "muted" }, "Fill in the values and press Check."));
+    const keep = datasetSelect.value;
+    setTimeout(() => { datasetSelect.value = keep; }, 0);
+    resetResult();
   });
 
-  const from = new URLSearchParams(window.location.search).get("from");
-  if (from) {
-    $("load-id").value = from;
-    loadFrom(from);
-  }
+  (async function start() {
+    try {
+      const { items } = await SB.api("/api/models");
+      const trained = items.filter((m) => m.model);
+      if (!trained.length) {
+        SB.message($("predict-error"), "No model has been trained yet. Run python -m ml.train first.");
+        return;
+      }
+      formats = Object.fromEntries(trained.map((m) => [m.key, m]));
+      datasetSelect.replaceChildren(...trained.map((m) => SB.el("option", { value: m.key }, m.title)));
+      showFields(trained[0].key);
+      const from = new URLSearchParams(window.location.search).get("from");
+      if (from) {
+        $("load-id").value = from;
+        loadFrom(from);
+      }
+    } catch (error) {
+      SB.message($("predict-error"), error.message);
+    }
+  })();
 })();

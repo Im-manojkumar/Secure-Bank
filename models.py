@@ -12,11 +12,18 @@ from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import JSON
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from ml.datasets import PROFILES
+
 db = SQLAlchemy()
 
 ROLES = ("admin", "analyst")
 CASE_STATUSES = ("Open", "Under Review", "Resolved")
 CASE_OUTCOMES = ("Confirmed fraud", "Legitimate")
+
+
+def currency_of(dataset):
+    """The currency code of a dataset's amounts, or None when it has none (PaySim)."""
+    return PROFILES[dataset].currency if dataset in PROFILES else None
 
 
 def utcnow():
@@ -55,6 +62,8 @@ class DataSource(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     source_type = db.Column(db.String(50), nullable=False, default="csv_upload")
+    # The file's format (a key in ml/datasets.py), which decides the model that scores it.
+    dataset = db.Column(db.String(30), nullable=False, default="creditcard", index=True)
     status = db.Column(db.String(20), nullable=False, default="processing")
     rows_received = db.Column(db.Integer, default=0)
     rows_imported = db.Column(db.Integer, default=0)
@@ -68,6 +77,7 @@ class DataSource(db.Model):
             "id": self.id,
             "name": self.name,
             "source_type": self.source_type,
+            "dataset": self.dataset,
             "status": self.status,
             "rows_received": self.rows_received,
             "rows_imported": self.rows_imported,
@@ -87,7 +97,7 @@ class Transaction(db.Model):
     transaction_type = db.Column(db.String(50), nullable=False, default="card")
     # Row number in the original file, so a record can be traced back to its source.
     raw_data_reference = db.Column(db.String(100))
-    # Model inputs (Time, V1..V28, Amount) exactly as imported.
+    # The row's input columns exactly as imported (which ones depends on the dataset format).
     features = db.Column(JSON, nullable=False)
     # The label shipped with the dataset, when it has one. Kept for evaluation only.
     dataset_label = db.Column(db.Integer)
@@ -102,10 +112,16 @@ class Transaction(db.Model):
     )
     case = db.relationship("FraudCase", uselist=False, back_populates="transaction")
 
+    @property
+    def dataset(self):
+        return self.source.dataset if self.source else None
+
     def to_dict(self, include_features=False):
         data = {
             "id": self.id,
             "source_id": self.source_id,
+            "dataset": self.dataset,
+            "currency": currency_of(self.dataset),
             "amount": self.amount,
             "timestamp": self.timestamp.isoformat(),
             "transaction_type": self.transaction_type,
@@ -127,6 +143,8 @@ class Prediction(db.Model):
     model_version = db.Column(db.String(100), nullable=False)
     predicted_label = db.Column(db.Integer, nullable=False, index=True)
     risk_score = db.Column(db.Float, nullable=False)
+    # For suspicious rows: the inputs that raised the score most (see ml/explain.py).
+    explanation = db.Column(JSON)
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
     transaction = db.relationship("Transaction", back_populates="prediction")
@@ -136,6 +154,7 @@ class Prediction(db.Model):
             "model_version": self.model_version,
             "predicted_label": self.predicted_label,
             "risk_score": round(self.risk_score, 6),
+            "explanation": self.explanation,
             "created_at": self.created_at.isoformat(),
         }
 
@@ -173,9 +192,12 @@ class FraudCase(db.Model):
             t = self.transaction
             data["transaction"] = {
                 "id": t.id,
+                "dataset": t.dataset,
+                "currency": currency_of(t.dataset),
                 "amount": t.amount,
                 "timestamp": t.timestamp.isoformat(),
                 "risk_score": round(t.prediction.risk_score, 6) if t.prediction else None,
+                "explanation": t.prediction.explanation if t.prediction else None,
             }
         return data
 

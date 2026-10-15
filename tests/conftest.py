@@ -4,18 +4,20 @@ import pytest
 
 from app import create_app
 from config import TestConfig
-from ml.sample_data import make_sample
+from ml.sample_data import make_paysim_sample, make_sample, make_sparkov_sample
 from ml.train import train
 from models import User, db
 
 
 @pytest.fixture(scope="session")
 def model_dir(tmp_path_factory):
-    """Train a small model on fake data once for the whole test run."""
+    """Train a small model per dataset format on fake data, once for the whole test run."""
     data_dir = tmp_path_factory.mktemp("data")
-    out = tmp_path_factory.mktemp("model")
-    make_sample(rows=4000, fraud_rate=0.03).to_csv(data_dir / "train.csv", index=False)
-    train(data_dir / "train.csv", out_dir=out)
+    out = tmp_path_factory.mktemp("models")
+    for dataset, maker, rows in (("creditcard", make_sample, 4000), ("sparkov", make_sparkov_sample, 3000),
+                                 ("paysim", make_paysim_sample, 3000)):
+        maker(rows=rows, fraud_rate=0.03).to_csv(data_dir / f"{dataset}.csv", index=False)
+        train(data_dir / f"{dataset}.csv", out_dir=out / dataset, dataset=dataset)
     return out
 
 

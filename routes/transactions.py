@@ -7,11 +7,12 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import select
 
+from ml.datasets import DEFAULT_PROFILE, PROFILES
 from models import DataSource, FraudCase, Prediction, Transaction, db
 from routes.auth import role_required
 from routes.pagination import paginate
 from services.ingestion import CSVImportError, import_transactions, record_failed_import
-from services.prediction import ModelNotReady, parse_features, predict_one
+from services.prediction import ModelNotReady, describe_models, predict_one
 
 bp = Blueprint("transactions", __name__, url_prefix="/api")
 
@@ -73,12 +74,18 @@ def list_sources():
 def list_transactions():
     """Search transactions.
 
-    Filters (all optional): source_id, date_from, date_to, min_amount,
+    Filters (all optional): source_id, dataset, date_from, date_to, min_amount,
     max_amount, prediction (suspicious | low_risk), status (a case status).
     """
     args = request.args
     query = select(Transaction).join(Prediction, Prediction.transaction_id == Transaction.id, isouter=True)
     try:
+        if "dataset" in args:
+            if args["dataset"] not in PROFILES:
+                raise FilterError(f"dataset must be one of: {', '.join(PROFILES)}")
+            query = query.join(DataSource, DataSource.id == Transaction.source_id).where(
+                DataSource.dataset == args["dataset"]
+            )
         if "source_id" in args:
             query = query.where(Transaction.source_id == int(_parse_float(args["source_id"], "source_id")))
         if "date_from" in args:
@@ -112,13 +119,26 @@ def get_transaction(transaction_id):
     return jsonify(transaction=transaction.to_dict(include_features=True))
 
 
+@bp.get("/models")
+@login_required
+def list_models():
+    """The dataset formats SecureBank understands, with each one's trained model if any."""
+    return jsonify(items=describe_models())
+
+
 @bp.post("/predict")
 @login_required
 def predict():
-    row, errors = parse_features(request.get_json(silent=True))
+    """Score one transaction. The body holds its input columns, plus an optional
+    "dataset" naming the format (default: creditcard)."""
+    payload = request.get_json(silent=True)
+    dataset = payload.get("dataset", DEFAULT_PROFILE) if isinstance(payload, dict) else DEFAULT_PROFILE
+    if dataset not in PROFILES:
+        return jsonify(error=f"dataset must be one of: {', '.join(PROFILES)}"), 400
+    row, errors = PROFILES[dataset].parse_input(payload)
     if errors:
         return jsonify(error="Invalid transaction.", details=errors), 400
     try:
-        return jsonify(predict_one(row))
+        return jsonify(predict_one(dataset, row))
     except ModelNotReady as exc:
         return jsonify(error=str(exc)), 503

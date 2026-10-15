@@ -4,7 +4,8 @@ from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import select
 
-from models import CASE_STATUSES, FraudCase, Prediction, Transaction, db
+from ml.datasets import PROFILES
+from models import CASE_STATUSES, DataSource, FraudCase, Prediction, Transaction, db
 from routes.auth import role_required
 from routes.pagination import paginate
 from services import audit
@@ -16,7 +17,7 @@ bp = Blueprint("alerts", __name__, url_prefix="/api")
 @bp.get("/alerts")
 @login_required
 def list_alerts():
-    """List fraud cases, highest risk first. Optional filter: ?status=Open."""
+    """List fraud cases, highest risk first. Optional filters: ?status=Open, ?dataset=sparkov."""
     query = (
         select(FraudCase)
         .join(Transaction, Transaction.id == FraudCase.transaction_id)
@@ -27,6 +28,11 @@ def list_alerts():
         if status not in CASE_STATUSES:
             return jsonify(error=f"status must be one of: {', '.join(CASE_STATUSES)}"), 400
         query = query.where(FraudCase.status == status)
+    dataset = request.args.get("dataset")
+    if dataset:
+        if dataset not in PROFILES:
+            return jsonify(error=f"dataset must be one of: {', '.join(PROFILES)}"), 400
+        query = query.join(DataSource, DataSource.id == Transaction.source_id).where(DataSource.dataset == dataset)
     query = query.order_by(Prediction.risk_score.desc(), FraudCase.id)
     return paginate(query, lambda c: c.to_dict())
 

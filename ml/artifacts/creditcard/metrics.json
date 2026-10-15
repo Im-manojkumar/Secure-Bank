@@ -55,6 +55,20 @@
         "fn": 23,
         "tp": 71
       }
+    },
+    "Gradient Boosting": {
+      "threshold": 0.934821,
+      "precision": 0.9211,
+      "recall": 0.7447,
+      "f1": 0.8235,
+      "pr_auc": 0.794,
+      "roc_auc": 0.9655,
+      "confusion_matrix": {
+        "tn": 56645,
+        "fp": 6,
+        "fn": 24,
+        "tp": 70
+      }
     }
   },
   "test": {
@@ -113,7 +127,21 @@
         "fn": 24,
         "tp": 71
       }
+    },
+    "Gradient Boosting": {
+      "threshold": 0.934821,
+      "precision": 0.925,
+      "recall": 0.7789,
+      "f1": 0.8457,
+      "pr_auc": 0.8579,
+      "roc_auc": 0.9779,
+      "confusion_matrix": {
+        "tn": 56645,
+        "fp": 6,
+        "fn": 21,
+        "tp": 74
+      }
     }
   },
-  "best_model": "Random Forest"
+  "best_model": "Gradient Boosting"
 }

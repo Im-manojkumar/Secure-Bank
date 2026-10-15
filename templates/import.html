@@ -4,7 +4,8 @@
 <div class="page-head">
   <div>
     <h1>Import transactions</h1>
-    <p class="lede">Upload a CSV with the columns Time, V1 to V28 and Amount. Class is optional.</p>
+    <p class="lede">Upload a CSV in one of the three formats below. SecureBank recognises the format from the columns
+      and scores it with the model trained on that format.</p>
   </div>
 </div>
 
@@ -21,6 +22,22 @@
     <button class="btn btn-primary" type="submit">Import</button>
   </div>
 </form>
+
+<div class="card mt-16">
+  <h2>Supported formats</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Format</th><th>Required columns</th><th>Label column (optional)</th></tr></thead>
+      <tbody>
+        <tr><td>Kaggle credit card</td><td class="wrap">Time, V1 to V28, Amount</td><td>Class</td></tr>
+        <tr><td>Sparkov card payments</td><td class="wrap">trans_date_trans_time, category, amt, dob, city_pop, lat, long, merch_lat, merch_long</td><td>is_fraud</td></tr>
+        <tr><td>PaySim mobile money</td><td class="wrap">step, type, amount, oldbalanceOrg, newbalanceOrig, oldbalanceDest, newbalanceDest</td><td>isFraud</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="muted">Other columns are ignored, except merchant, city, state and transaction number (Sparkov) and the account IDs
+     (PaySim), which are kept to help reviewers. Names, street addresses, jobs, gender and full card numbers are never stored.</p>
+</div>
 
 <div class="card mt-16">
   <h2>Import history</h2>

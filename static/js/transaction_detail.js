@@ -3,10 +3,11 @@
   const PAGE_ID = $("page-title").dataset.id;
   try {
     const { transaction: t } = await SB.api(`/api/transactions/${PAGE_ID}`);
-    $("tx-sub").textContent = `${SB.money(t.amount)} on ${SB.dateTime(t.timestamp)}`;
+    $("tx-sub").textContent = `${SB.money(t.amount, t.currency)} on ${SB.dateTime(t.timestamp)}`;
 
     $("tx-details").replaceChildren(
-      SB.el("dt", {}, "Amount"), SB.el("dd", {}, SB.money(t.amount)),
+      SB.el("dt", {}, "Data"), SB.el("dd", {}, SB.datasetName(t.dataset)),
+      SB.el("dt", {}, "Amount"), SB.el("dd", {}, SB.money(t.amount, t.currency)),
       SB.el("dt", {}, "Time"), SB.el("dd", {}, SB.dateTime(t.timestamp)),
       SB.el("dt", {}, "Type"), SB.el("dd", {}, t.transaction_type),
       SB.el("dt", {}, "Source record"), SB.el("dd", {}, t.raw_data_reference || "–"),
@@ -24,6 +25,8 @@
             SB.el("dt", {}, "Risk score"), SB.el("dd", {}, SB.score(p.risk_score)),
             SB.el("dt", {}, "Model"), SB.el("dd", {}, p.model_version),
             SB.el("dt", {}, "Scored"), SB.el("dd", {}, SB.dateTime(p.created_at))),
+          p.predicted_label === 1 ? SB.el("h3", { class: "mt-16" }, "Why it was flagged") : null,
+          p.predicted_label === 1 ? SB.reasons(p.explanation) : null,
           SB.el("p", { class: "muted" }, "A prediction is not proof of fraud. Suspicious transactions are sent for review."))
       : SB.el("p", { class: "muted" }, "This transaction has not been scored."));
 
@@ -33,7 +36,7 @@
     $("tx-actions").append(SB.el("a", { class: "btn", href: `/predict?from=${t.id}` }, "Re-check with the model"));
 
     $("tx-features").replaceChildren(...Object.entries(t.features).map(([name, value]) =>
-      SB.el("div", { class: "feature" }, SB.el("span", {}, name), value.toFixed(4))));
+      SB.el("div", { class: "feature" }, SB.el("span", {}, name), SB.inputValue(value))));
   } catch (error) {
     SB.message($("tx-error"), error.status === 404 ? "This transaction does not exist." : error.message);
   }

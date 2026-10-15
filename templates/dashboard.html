@@ -4,9 +4,18 @@
 <div class="page-head">
   <div>
     <h1>Dashboard</h1>
-    <p class="lede">All imported transactions and what the model flagged.</p>
+    <p class="lede">Imported transactions and what the models flagged.</p>
   </div>
-  <a class="btn" href="{{ url_for('pages.alerts') }}">Review alerts</a>
+  <div class="actions">
+    <label for="dash-dataset" class="visually-hidden">Data</label>
+    <select id="dash-dataset" class="input-medium">
+      <option value="">All data</option>
+      <option value="creditcard">Kaggle credit card</option>
+      <option value="sparkov">Sparkov card payments</option>
+      <option value="paysim">PaySim mobile money</option>
+    </select>
+    <a class="btn" href="{{ url_for('pages.alerts') }}">Review alerts</a>
+  </div>
 </div>
 <p id="dashboard-error" role="alert" hidden></p>
 
@@ -14,16 +23,16 @@
   <div class="card"><p class="tile-label">Transactions</p><p class="tile-value" id="t-total">–</p><p class="tile-sub">imported and scored</p></div>
   <div class="card"><p class="tile-label">Flagged as suspicious</p><p class="tile-value" id="t-flagged">–</p><p class="tile-sub" id="t-rate">&nbsp;</p></div>
   <div class="card"><p class="tile-label">Waiting for review</p><p class="tile-value" id="t-pending">–</p><p class="tile-sub">open or under review</p></div>
-  <div class="card"><p class="tile-label">Amount flagged</p><p class="tile-value" id="t-amount">–</p><p class="tile-sub">total of suspicious transactions</p></div>
+  <div class="card"><p class="tile-label">Amount flagged</p><div class="tile-value tile-lines" id="t-amount">–</div><p class="tile-sub">total of suspicious transactions</p></div>
 </section>
 
 <section class="grid two-col">
   <div class="card">
-    <h2>Transactions per hour</h2>
+    <h2 id="volume-title">Transactions per hour</h2>
     <div class="chart" id="chart-volume"></div>
   </div>
   <div class="card">
-    <h2>Suspicious transactions per hour</h2>
+    <h2 id="suspicious-title">Suspicious transactions per hour</h2>
     <div class="chart" id="chart-suspicious"></div>
   </div>
 </section>
