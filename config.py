@@ -8,6 +8,12 @@ BASE_DIR = Path(__file__).resolve().parent
 
 
 class Config:
+    # "production" turns on the checks and settings a public server needs (see app.py).
+    ENV_NAME = os.environ.get("SECUREBANK_ENV", "development")
+    # Behind a reverse proxy (Caddy, nginx), trust its X-Forwarded-For and -Proto headers,
+    # so the login limit and the audit log see the visitor's address, not the proxy's.
+    TRUST_PROXY = os.environ.get("TRUST_PROXY", "0") == "1"
+    BACKUP_DIR = Path(os.environ.get("BACKUP_DIR", BASE_DIR / "backups"))
     # When unset, create_app generates a random key and warns.
     SECRET_KEY = os.environ.get("SECRET_KEY")
     SQLALCHEMY_DATABASE_URI = os.environ.get(

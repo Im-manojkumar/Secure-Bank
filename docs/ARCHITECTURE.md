@@ -187,6 +187,8 @@ This works the same for every model type, and the typical values are saved in `m
 | Bad uploads | Files over 200 MB are refused. Files must be CSV with the expected columns, and invalid rows are skipped and counted. | `config.py`, `services/ingestion.py` |
 | Untraceable changes | Logins, failed logins, imports, case changes, new users, two-factor changes, API keys, retrains, and saved, deleted and downloaded reports are written to `audit_logs`, in the same transaction as the change. | `services/audit.py` |
 | Spreadsheet formula injection | Text cells in CSV downloads that start with `=`, `+`, `-` or `@` get a leading `'`, so a spreadsheet shows them instead of running them. Downloads are capped at `EXPORT_MAX_ROWS` (100,000) and each one is audited. | `services/search.py`, `routes/reports.py` |
+| Eavesdropping, stolen cookies | In production, Caddy serves HTTPS only; cookies are `Secure` and `Strict-Transport-Security` keeps browsers on HTTPS. The app refuses to start without long random `SECRET_KEY` and `CARD_ID_KEY` values. Behind the proxy, only its `X-Forwarded-For` is trusted, so the login limit sees real addresses. | `app.py` (`check_production`), `docker-compose.yml`, `deploy/Caddyfile` |
+| Lost data | `flask backup-db` takes a consistent copy of the database while the app runs, keeping the newest 14; the deployment guide runs it nightly. | `app.py`, `docs/DEPLOYMENT.md` |
 | Leaked secrets or data | `SECRET_KEY` and `CARD_ID_KEY` come from the environment. Card numbers are stored only as a keyed hash and the last four digits. The dataset, database and trained model are git-ignored. | `config.py`, `.gitignore` |
 
 The app never asks for or stores bank passwords, PINs, CVVs, OTPs or access tokens. A real bank integration would go through an authorised provider's API and consent flow, as section 10 of the project spec describes.
@@ -195,6 +197,6 @@ The app never asks for or stores bank passwords, PINs, CVVs, OTPs or access toke
 
 - The login limit counts attempts in the database, keyed by email and IP address. Someone using many IP addresses could still guess passwords slowly, though two-factor login stops a guessed password from being enough on its own. A production system would add a per-account lock.
 - The two-factor secret is stored as it is, because the server needs it to check codes. A production system would encrypt it with a key held outside the database. There are no recovery codes yet; an admin who loses their phone needs another admin to clear `totp_secret` in the database.
-- `flask run` serves plain HTTP. In production, put the app behind HTTPS and set `SESSION_COOKIE_SECURE=1`.
+- `flask run` serves plain HTTP and is for development only. [DEPLOYMENT.md](DEPLOYMENT.md) runs the app with gunicorn behind HTTPS. Logs go to the container output; a real deployment would ship them to a log service with alerts.
 - SQLite suits one server. The spec's planned move to PostgreSQL only needs `DATABASE_URL` changed, plus one SQLite-specific `strftime` call in `routes/dashboard.py`.
-- A score above the threshold opens a case for a person to review. It never blocks a payment.
+- On import, a score above the threshold opens a case for a person to review; it never blocks a payment. The live API answers `decline` above `DECLINE_SCORE`, but the calling payment system decides what to do with that answer.

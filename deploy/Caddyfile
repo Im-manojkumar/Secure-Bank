@@ -1,0 +1,10 @@
+# SITE_ADDRESS is your domain (for example fraud.example.com), and Caddy fetches a
+# certificate for it from Let's Encrypt. With "localhost" it uses its own local
+# certificate, which browsers warn about but is fine for a demo.
+{$SITE_ADDRESS} {
+	encode gzip
+	request_body {
+		max_size 200MB
+	}
+	reverse_proxy app:8000
+}
