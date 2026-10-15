@@ -149,6 +149,22 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | TF-05 | Admin without two-factor when it is required | API 403 and pages redirect to Account until set up; cannot turn it off afterwards | `test_admins_must_set_it_up_before_anything_else` |
 | TF-06 | Analyst turns it off | Needs the right password and a code; both changes audited | `test_analyst_can_turn_it_off_with_password_and_code` |
 
+## 7e. Production deployment (`tests/test_deployment.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| DP-01 | Production mode without `SECRET_KEY` | Refuses to start, naming the missing setting | `test_production_refuses_to_start_without_a_secret_key` |
+| DP-02 | Production mode with the development `CARD_ID_KEY` | Refuses to start | `test_production_refuses_the_development_card_key` |
+| DP-03 | Production mode with a short key, or the example value from `deploy/env.example` | Refuses to start | `test_production_refuses_weak_or_example_secrets` |
+| DP-04 | Log in in production mode, even with `SESSION_COOKIE_SECURE` off | Cookie marked `Secure`; `Strict-Transport-Security` sent | `test_production_forces_secure_cookies_and_hsts` |
+| DP-05 | Development mode | No `Strict-Transport-Security` header | `test_development_sends_no_hsts` |
+| DP-06 | Failed login through a trusted proxy with `X-Forwarded-For: 203.0.113.7` | Audit log records 203.0.113.7 | `test_behind_a_proxy_the_visitor_address_is_logged` |
+| DP-07 | The same header without `TRUST_PROXY` | Ignored, so it cannot dodge the login limit | `test_forwarded_address_is_ignored_without_a_proxy` |
+| DP-08 | `GET /api/health` | 200 with the database ok; 503 when the database fails | `test_health_check_reports_the_database`, `test_health_check_fails_when_the_database_is_down` |
+| DP-09 | An unexpected error in a page | 500 page without the error's details; the traceback is logged | `test_unexpected_errors_are_logged_and_hidden` |
+| DP-10 | `flask backup-db --keep 2` with three older backups | A readable copy of the database; only the two newest backups kept | `test_backup_copies_the_database_and_keeps_the_newest` |
+| DP-11 | `flask backup-db` on an in-memory database | Refused with a message | `test_backup_needs_a_database_file` |
+
 ## 8. Saved reports and CSV downloads (`tests/test_reports.py`)
 
 | ID | Case | Expected result | Test |
@@ -189,3 +205,5 @@ These were run in Chromium against the full Kaggle dataset (283,726 transactions
 | UI-14 | Click Download CSV on Transactions with no filters | "This matches 1,139,445 transactions. Narrow the filters…", and no file is saved |
 
 Two-factor login was checked in Chromium: an admin without it lands on the Account page and is sent back there from other pages; after adding the key to an app and entering a code, the dashboard opens; on the next login the page asks for the code and then logs in.
+
+The Docker setup was checked by building the image and running it behind Caddy: the app refused to start without its keys, then reported healthy as a non-root user; login over HTTPS set a `Secure` cookie with `Strict-Transport-Security`; the audit log recorded the visitor's address rather than Caddy's; and `flask backup-db` wrote a copy to the data volume.

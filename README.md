@@ -291,11 +291,23 @@ The main protections are:
 
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#security) lists each risk, how it is handled, and the known limits.
 
-Before running anywhere other than your own machine:
-- Set a long random `SECRET_KEY`. Without one, a random key is generated and logins reset on every restart.
-- Set a long random `CARD_ID_KEY` before the first import. It keys the hash that links a card's payments without storing its number; changing it later breaks the link between old and new payments.
-- Serve the app over HTTPS and set `SESSION_COOKIE_SECURE=1`.
-- Use a production server such as gunicorn rather than `flask run`.
+## Deploying
+
+`flask run` is for development only. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) runs SecureBank on a server with Docker: gunicorn serves the app, and Caddy in front of it gets an HTTPS certificate and renews it.
+
+```bash
+cp deploy/env.example .env        # then fill in SECRET_KEY, CARD_ID_KEY and SITE_ADDRESS
+docker compose up -d --build
+docker compose exec app flask create-user admin@yourbank.example --role admin
+```
+
+With `SECUREBANK_ENV=production`, which the Docker image sets:
+- The app refuses to start without a long random `SECRET_KEY` and `CARD_ID_KEY`. `CARD_ID_KEY` keys the hash that links a card's payments without storing its number, so set it before the first import and never change it.
+- Cookies are sent only over HTTPS, and browsers are told to use HTTPS for a year.
+- Errors are logged with their tracebacks, and visitors see only "Something went wrong".
+- `/api/health` checks the database, for uptime monitors.
+
+`flask --app app backup-db` copies the database safely while the app is running and keeps the newest 14 copies. The deployment guide schedules it every night.
 
 ## Tests
 
@@ -303,12 +315,12 @@ Before running anywhere other than your own machine:
 pytest
 ```
 
-There are 147 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
+There are 160 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, saved reports with their CSV downloads, and the production settings.
 
 ## Project layout
 
 ```
-app.py            Flask app factory and CLI commands (init-db, create-user, import-csv, retrain, create-api-key, revoke-api-key)
+app.py            Flask app factory and CLI commands (init-db, create-user, import-csv, retrain, create-api-key, revoke-api-key, backup-db)
 config.py         settings, overridable with environment variables
 models.py         database tables
 routes/           API endpoints (auth, transactions, alerts, reports, dashboard, audit) and HTML pages (pages.py)
@@ -324,7 +336,9 @@ ml/
   predict.py      load a saved model, score and explain new rows
   sample_data.py  generate fake data in each format
   artifacts/      one folder per format with its model, metrics and charts
-docs/             architecture, test cases and screenshots
+docs/             architecture, deployment guide, test cases and screenshots
+Dockerfile        production image (gunicorn); docker-compose.yml adds Caddy for HTTPS
+deploy/           Caddyfile and the example .env
 data/raw/         the dataset CSVs go here (not committed)
 tests/            pytest tests
 instance/         local SQLite database (not committed)

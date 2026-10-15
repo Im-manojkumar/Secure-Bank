@@ -26,7 +26,8 @@ LABEL = "label"  # The cleaned label column, whatever the file called it.
 # turned into a card_id with a keyed hash, so the stored ID cannot be turned back into
 # the number without the key. Set CARD_ID_KEY to a long random value in production;
 # changing it later breaks the link between old and new payments of the same card.
-CARD_ID_KEY = os.environ.get("CARD_ID_KEY", "securebank-development-card-key").encode()
+DEFAULT_CARD_ID_KEY = b"securebank-development-card-key"
+CARD_ID_KEY = os.environ.get("CARD_ID_KEY", "").encode() or DEFAULT_CARD_ID_KEY
 
 
 def card_ids(numbers):

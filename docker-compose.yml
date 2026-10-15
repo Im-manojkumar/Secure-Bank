@@ -1,0 +1,32 @@
+# SecureBank behind Caddy, which gets and renews an HTTPS certificate on its own.
+# Copy deploy/env.example to .env and fill it in first; see docs/DEPLOYMENT.md.
+services:
+  app:
+    build: .
+    env_file: .env
+    environment:
+      # Only Caddy can reach the app, so its X-Forwarded-For header can be trusted.
+      TRUST_PROXY: "1"
+    volumes:
+      - securebank-data:/data
+      - ./ml/artifacts:/app/ml/artifacts
+      - ./data/raw:/app/data/raw:ro
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2.8.4
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  securebank-data:
+  caddy-data:

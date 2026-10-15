@@ -1,0 +1,15 @@
+.git
+.github
+**/__pycache__
+*.pyc
+.pytest_cache
+venv
+.venv
+.env
+instance
+backups
+data/raw/*
+data/processed/*
+ml/artifacts/*/previous
+docs/screenshots
+tests

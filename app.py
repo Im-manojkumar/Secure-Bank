@@ -7,8 +7,11 @@ Run locally:
     flask --app app run
 """
 
+import logging
 import secrets
+import sqlite3
 import warnings
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -18,6 +21,7 @@ from flask import Flask, jsonify, redirect, render_template, request, url_for
 from flask_login import LoginManager
 from sqlalchemy import event
 from werkzeug.exceptions import HTTPException
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from config import Config
 from models import ROLES, User, db
@@ -44,9 +48,46 @@ def use_sqlite_wal(engine):
         cursor.close()
 
 
+class ConfigError(RuntimeError):
+    """The app is set to production but a required setting is missing."""
+
+
+def weak_secret(value):
+    """Shorter than 32 characters, or the placeholder from deploy/env.example."""
+    return len(value) < 32 or value.startswith("replace-with")
+
+
+def check_production(app):
+    """Refuse to start a production server with development secrets, and force secure cookies."""
+    from ml.datasets import CARD_ID_KEY, DEFAULT_CARD_ID_KEY
+
+    problems = []
+    secret = app.config.get("SECRET_KEY") or ""
+    if not secret:
+        problems.append("SECRET_KEY is not set")
+    elif weak_secret(secret):
+        problems.append("SECRET_KEY is too short or still the example value")
+    if CARD_ID_KEY == DEFAULT_CARD_ID_KEY:
+        problems.append("CARD_ID_KEY is not set")
+    elif weak_secret(CARD_ID_KEY.decode()):
+        problems.append("CARD_ID_KEY is too short or still the example value")
+    if problems:
+        raise ConfigError("Production settings missing: " + "; ".join(problems)
+                          + ". Set them to long random values (see docs/DEPLOYMENT.md).")
+    app.config.update(SESSION_COOKIE_SECURE=True, REMEMBER_COOKIE_SECURE=True)
+
+
 def create_app(config_class=Config):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_object(config_class)
+
+    production = app.config["ENV_NAME"] == "production"
+    if production:
+        check_production(app)
+        # One line per log record on stdout, where Docker and gunicorn collect it.
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    if app.config["TRUST_PROXY"]:
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     if not app.config.get("SECRET_KEY"):
         warnings.warn(
@@ -72,7 +113,13 @@ def create_app(config_class=Config):
 
     @app.get("/api/health")
     def health():
-        return jsonify(status="ok")
+        """For load balancers and uptime checks: is the database reachable?"""
+        try:
+            db.session.execute(sqlalchemy.text("SELECT 1"))
+        except sqlalchemy.exc.SQLAlchemyError:
+            app.logger.exception("Health check could not reach the database")
+            return jsonify(status="error", database="unreachable"), 503
+        return jsonify(status="ok", database="ok")
 
     return app
 
@@ -138,6 +185,9 @@ def register_security(app):
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "same-origin")
+        if app.config["SESSION_COOKIE_SECURE"]:
+            # Served over HTTPS: tell browsers never to use plain HTTP for this site.
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
         if request.path.startswith("/api/"):
             # API responses can contain transaction data: never cache them.
             response.headers.setdefault("Cache-Control", "no-store")
@@ -154,6 +204,8 @@ def register_error_handlers(app):
         pages = {
             403: ("No access", "Your role does not allow this page."),
             404: ("Page not found", "This page does not exist."),
+            # Flask has already logged the error with its traceback; the visitor sees none of it.
+            500: ("Something went wrong", "The error has been logged. Try again, or tell an admin if it keeps happening."),
         }
         if exc.code in pages:
             title, message = pages[exc.code]
@@ -282,6 +334,25 @@ def register_commands(app):
         })
         db.session.commit()
         click.echo("Restart the app to start scoring with the new model.")
+
+    @app.cli.command("backup-db")
+    @click.option("--keep", default=14, show_default=True, help="How many backups to keep; older ones are deleted")
+    def backup_db(keep):
+        """Copy the SQLite database to BACKUP_DIR, safely, even while the app is running."""
+        path = db.engine.url.database
+        if db.engine.dialect.name != "sqlite" or path in (None, "", ":memory:"):
+            raise click.ClickException("backup-db copies a SQLite database file; use your database's own tools otherwise.")
+        folder = Path(app.config["BACKUP_DIR"])
+        folder.mkdir(parents=True, exist_ok=True)
+        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        target = folder / f"securebank-{stamp}.db"
+        # SQLite's backup API copies a consistent snapshot while other connections keep writing.
+        with sqlite3.connect(path) as source, sqlite3.connect(target) as copy:
+            source.backup(copy)
+        old = sorted(folder.glob("securebank-*.db"))[:-keep] if keep > 0 else []
+        for item in old:
+            item.unlink()
+        click.echo(f"Backed up to {target}" + (f"; removed {len(old)} older backups" if old else ""))
 
     @app.cli.command("import-csv")
     @click.argument("path", type=click.Path(exists=True, dir_okay=False))
