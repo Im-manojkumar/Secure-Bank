@@ -32,6 +32,9 @@ class Config:
     # alert threshold and this, it approves but opens a case for review.
     DECLINE_SCORE = float(os.environ.get("DECLINE_SCORE", 0.98))
 
+    # Admins must set up two-factor login before they can use anything else.
+    REQUIRE_2FA_FOR_ADMINS = os.environ.get("REQUIRE_2FA_FOR_ADMINS", "1") == "1"
+
     PER_PAGE_DEFAULT = 25
     PER_PAGE_MAX = 100
     # Largest CSV download allowed, so one click cannot stream a million rows.
@@ -40,5 +43,7 @@ class Config:
 
 class TestConfig(Config):
     TESTING = True
+    # Tests of two-factor login turn this on themselves.
+    REQUIRE_2FA_FOR_ADMINS = False
     SECRET_KEY = "test-secret"
     SQLALCHEMY_DATABASE_URI = "sqlite://"

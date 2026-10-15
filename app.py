@@ -98,6 +98,23 @@ CONTENT_SECURITY_POLICY = (
 
 def register_security(app):
     @app.before_request
+    def require_two_factor_setup():
+        """An admin without two-factor login can only reach the setup page until they turn it on."""
+        from flask_login import current_user
+
+        from routes.auth import two_factor_missing
+
+        if not current_user.is_authenticated or not two_factor_missing(current_user):
+            return None
+        path = request.path
+        if path.startswith(("/api/auth/", "/static/", "/api/v1/")) or path in ("/account", "/favicon.ico"):
+            return None
+        if path.startswith("/api/"):
+            return jsonify(error="Set up two-factor login on the Account page first.",
+                           two_factor_setup_required=True), 403
+        return redirect(url_for("pages.account"))
+
+    @app.before_request
     def reject_cross_site_writes():
         """Block state-changing API calls sent from another website (CSRF).
 

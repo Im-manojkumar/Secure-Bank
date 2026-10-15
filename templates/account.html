@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Account{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Account</h1>
+    <p class="lede">{{ current_user.email }} · {{ current_user.role }}</p>
+  </div>
+</div>
+
+<section class="card narrow">
+  <h2>Two-factor login</h2>
+  <p id="tf-required" class="message message-warning" role="status" hidden>Admins must turn on two-factor login before using SecureBank.</p>
+  <p id="tf-status"></p>
+
+  <div id="tf-start" hidden>
+    <p>After your password, SecureBank will ask for a 6-digit code from an authenticator app on your phone, such as Google Authenticator, Microsoft Authenticator or Aegis.</p>
+    <button class="btn btn-primary" type="button" id="tf-setup">Set up two-factor login</button>
+  </div>
+
+  <form id="tf-confirm" hidden novalidate>
+    <ol>
+      <li>In your authenticator app, add an account and choose to enter a setup key.</li>
+      <li>Enter this key: <code id="tf-secret" class="secret"></code></li>
+      <li>Type the 6-digit code the app shows.</li>
+    </ol>
+    <p class="hint">Apps that take a link can use <code id="tf-uri" class="secret"></code></p>
+    <div class="field">
+      <label for="tf-code">Code from the app</label>
+      <input id="tf-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" class="input-small" required>
+    </div>
+    <button class="btn btn-primary" type="submit">Turn on</button>
+  </form>
+
+  <form id="tf-off" hidden novalidate>
+    <div class="field">
+      <label for="tf-password">Password</label>
+      <input id="tf-password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <div class="field">
+      <label for="tf-off-code">Code from the app</label>
+      <input id="tf-off-code" name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" class="input-small" required>
+    </div>
+    <button class="btn" type="submit">Turn off two-factor login</button>
+  </form>
+
+  <p id="tf-message" role="alert" hidden></p>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/account.js') }}"></script>
+{% endblock %}

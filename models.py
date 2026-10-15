@@ -39,6 +39,14 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), nullable=False, default="analyst")
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    # Two-factor login (services/totp.py): the shared secret once set up, and the
+    # last time step whose code was accepted, so a code cannot be used twice.
+    totp_secret = db.Column(db.String(32))
+    totp_last_step = db.Column(db.Integer)
+
+    @property
+    def two_factor_enabled(self):
+        return self.totp_secret is not None
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -51,7 +59,8 @@ class User(UserMixin, db.Model):
         return self.role == "admin"
 
     def to_dict(self):
-        return {"id": self.id, "email": self.email, "role": self.role}
+        return {"id": self.id, "email": self.email, "role": self.role,
+                "two_factor_enabled": self.two_factor_enabled}
 
 
 class DataSource(db.Model):

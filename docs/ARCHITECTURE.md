@@ -178,13 +178,14 @@ This works the same for every model type, and the typical values are saved in `m
 |---|---|---|
 | Stolen or guessed passwords | Passwords are stored as salted scrypt hashes and never in plain text. Login errors read the same for unknown emails and wrong passwords. | `models.User`, `routes/auth.py` |
 | Password guessing | After 5 failed logins for one email from one IP address within 15 minutes, logins are refused with HTTP 429. The count resets after a successful login. | `services/audit.py`, `routes/auth.py` |
+| Stolen passwords | Two-factor login with authenticator-app codes (TOTP, RFC 6238, written out in `services/totp.py`). Admins must set it up before anything else works. A wrong code counts as a failed login; a code cannot be reused. Turning it off needs the password and a code, and is audited. | `routes/auth.py`, `app.py` (`require_two_factor_setup`) |
 | Unauthorised access | Every page and API route needs a login. Importing and the audit log need the admin role. | `routes/auth.py` (`role_required`), `routes/pages.py` |
 | Cross-site request forgery | Session cookies are `SameSite=Lax` and `HttpOnly`. API writes whose `Origin` header names another site are rejected. | `config.py`, `app.py` (`reject_cross_site_writes`) |
 | Cross-site scripting | Pages insert user text with `textContent` only. A strict Content-Security-Policy allows only the app's own scripts and styles, with no inline code, and a test checks every page for inline code. | `static/js/common.js`, `app.py` |
 | Clickjacking, MIME sniffing, caching | `X-Frame-Options: DENY`, `frame-ancestors 'none'`, `X-Content-Type-Options: nosniff`, and `Cache-Control: no-store` on API responses. | `app.py` (`security_headers`) |
 | Open redirect after login | `?next=` only follows paths on the same site. | `routes/pages.py` (`_safe_next`) |
 | Bad uploads | Files over 200 MB are refused. Files must be CSV with the expected columns, and invalid rows are skipped and counted. | `config.py`, `services/ingestion.py` |
-| Untraceable changes | Logins, failed logins, imports, case changes, new users, and saved, deleted and downloaded reports are written to `audit_logs`, in the same transaction as the change. | `services/audit.py` |
+| Untraceable changes | Logins, failed logins, imports, case changes, new users, two-factor changes, API keys, retrains, and saved, deleted and downloaded reports are written to `audit_logs`, in the same transaction as the change. | `services/audit.py` |
 | Spreadsheet formula injection | Text cells in CSV downloads that start with `=`, `+`, `-` or `@` get a leading `'`, so a spreadsheet shows them instead of running them. Downloads are capped at `EXPORT_MAX_ROWS` (100,000) and each one is audited. | `services/search.py`, `routes/reports.py` |
 | Leaked secrets or data | `SECRET_KEY` and `CARD_ID_KEY` come from the environment. Card numbers are stored only as a keyed hash and the last four digits. The dataset, database and trained model are git-ignored. | `config.py`, `.gitignore` |
 
@@ -192,7 +193,8 @@ The app never asks for or stores bank passwords, PINs, CVVs, OTPs or access toke
 
 ### Known limits
 
-- The login limit counts attempts in the database, keyed by email and IP address. Someone using many IP addresses could still guess slowly. A production system would add a per-account lock and multi-factor login.
+- The login limit counts attempts in the database, keyed by email and IP address. Someone using many IP addresses could still guess passwords slowly, though two-factor login stops a guessed password from being enough on its own. A production system would add a per-account lock.
+- The two-factor secret is stored as it is, because the server needs it to check codes. A production system would encrypt it with a key held outside the database. There are no recovery codes yet; an admin who loses their phone needs another admin to clear `totp_secret` in the database.
 - `flask run` serves plain HTTP. In production, put the app behind HTTPS and set `SESSION_COOKIE_SECURE=1`.
 - SQLite suits one server. The spec's planned move to PostgreSQL only needs `DATABASE_URL` changed, plus one SQLite-specific `strftime` call in `routes/dashboard.py`.
 - A score above the threshold opens a case for a person to review. It never blocks a payment.

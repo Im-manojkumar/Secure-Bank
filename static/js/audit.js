@@ -9,6 +9,7 @@
     import_completed: "Import completed", import_failed: "⚠ Import failed", case_updated: "Case updated", user_created: "User created",
     report_saved: "Report saved", report_deleted: "Report deleted", report_exported: "CSV downloaded",
     model_retrained: "Model retrained", api_key_created: "API key created", api_key_revoked: "API key revoked",
+    two_factor_enabled: "Two-factor login on", two_factor_disabled: "⚠ Two-factor login off",
   };
 
   // Plain-language summary of the details object for each kind of entry.
