@@ -9,9 +9,13 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | ML-01 | Dataset missing a column | Rejected with the column named | `test_load_data_rejects_missing_columns` |
 | ML-02 | Dataset file not found | Error says where to put `creditcard.csv` | `test_load_data_missing_file_has_helpful_message` |
 | ML-03 | Dataset with duplicate rows | Duplicates removed | `test_load_data_drops_duplicates` |
-| ML-04 | Train, validation and test split | Splits don't overlap and each keeps the fraud rate | `test_split_is_stratified_and_disjoint` |
+| ML-04 | Train, validation and test split by time | Every training row comes before every validation row, and those before every test row; 60/20/20 | `test_split_follows_time` |
+| ML-04a | Rows with the same time at a split edge | They stay in the same set | `test_time_split_keeps_rows_with_the_same_time_together` |
+| ML-04b | A period with no fraud | Refused with the period named, since models cannot be compared on it | `test_time_split_refuses_a_period_without_fraud` |
+| ML-04c | Sparkov's separate test file | Validation is the latest 25% of the training file; the test file is used as it is | `test_sparkov_validation_is_the_latest_part_of_the_training_file` |
+| ML-04d | Random split (`--random-split`, for comparison) | Splits don't overlap and each keeps the fraud rate | `test_random_split_is_stratified_and_disjoint` |
 | ML-05 | Threshold choice | Threshold separates fraud from non-fraud when the scores allow it | `test_best_f1_threshold_separates_perfect_scores` |
-| ML-06 | Full training run | Four models compared, model and reports saved, best model finds over 70% of fraud in the test data | `test_train_saves_model_that_scores_new_rows` |
+| ML-06 | Full training run | Four models compared, model and reports saved, best model finds over 70% of fraud in the test data, split recorded as "time" | `test_train_saves_model_that_scores_new_rows` |
 
 ## 2. Login and roles (`tests/test_api.py`, `tests/test_pages.py`, `tests/test_security.py`)
 

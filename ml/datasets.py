@@ -120,6 +120,10 @@ class Profile:
     def transaction_types(self, df):
         return np.full(len(df), "card", dtype=object)
 
+    def time_order(self, df):
+        """A sortable value per row giving when it happened, for splitting by time."""
+        raise NotImplementedError
+
     def to_dict(self):
         return {
             "key": self.key, "title": self.title, "description": self.description,
@@ -226,6 +230,9 @@ class CreditCard(Profile):
         start = config["DATASET_START"]
         return [start + timedelta(seconds=float(s)) for s in df["Time"]]
 
+    def time_order(self, df):
+        return df["Time"].astype(float)
+
 
 # --- Sparkov simulated card transactions ---------------------------------------
 
@@ -303,6 +310,9 @@ class Sparkov(Profile):
     def timestamps(self, df, config):
         return list(pd.to_datetime(df["trans_date_trans_time"]).dt.to_pydatetime())
 
+    def time_order(self, df):
+        return pd.to_datetime(df["trans_date_trans_time"])
+
 
 # --- PaySim simulated mobile money ---------------------------------------------
 
@@ -370,6 +380,9 @@ class PaySim(Profile):
 
     def timestamps(self, df, config):
         return [PAYSIM_START + timedelta(hours=float(s)) for s in df["step"]]
+
+    def time_order(self, df):
+        return df["step"].astype(float)
 
     def transaction_types(self, df):
         return df["type"].map(PAYSIM_TYPES).to_numpy(dtype=object)

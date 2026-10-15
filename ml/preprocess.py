@@ -1,14 +1,15 @@
 """Load and split a fraud dataset for training.
 
 Which columns a file needs and how they become model inputs is described by
-a profile in ml/datasets.py. Splitting is stratified so every split keeps
-the same small fraud rate. Scaling and resampling are NOT done here: they
+a profile in ml/datasets.py. Splitting follows time by default: the model
+learns from earlier transactions and is tested on later ones. Scaling and resampling are NOT done here: they
 live inside the model pipelines in train.py so they are fitted on training
 data only.
 """
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
@@ -54,13 +55,56 @@ def load_data(path=DEFAULT_DATA_PATH, dataset=DEFAULT_PROFILE):
     return df
 
 
-def split_data(df, dataset=DEFAULT_PROFILE, random_state=42):
-    """Split 60% train, 20% validation, 20% test, stratified on the label.
+def _time_cuts(order, fractions):
+    """Boolean masks that cut rows into consecutive periods by time.
 
-    The validation set picks the best model and its alert threshold.
+    fractions are the cumulative shares where each period ends, e.g. (0.6, 0.8).
+    Rows with the same time always land in the same period, so a period can be
+    a little bigger or smaller than its share.
+    """
+    ordered = np.sort(order.to_numpy())
+    edges = [ordered[min(int(f * len(ordered)), len(ordered) - 1)] for f in fractions]
+    masks, previous = [], None
+    for edge in edges + [None]:
+        mask = pd.Series(True, index=order.index)
+        if previous is not None:
+            mask &= order >= previous
+        if edge is not None:
+            mask &= order < edge
+        masks.append(mask)
+        previous = edge
+    return masks
+
+
+def _check_has_fraud(**splits):
+    for name, y in splits.items():
+        if len(y) == 0 or y.sum() == 0:
+            raise ValueError(
+                f"The {name} period has no fraud cases, so models cannot be compared on it. "
+                "Use a larger file, or --random-split."
+            )
+
+
+def split_data(df, dataset=DEFAULT_PROFILE, random_state=42, by_time=True):
+    """Split into train, validation and test sets: 60%, 20%, 20%.
+
+    By default the split follows time: the model learns from the earliest 60%
+    of transactions, the validation set (which picks the model and its alert
+    threshold) is the next 20%, and the test set is the latest 20%. This is how
+    a deployed model is used: trained on the past, judged on what comes next.
+
+    by_time=False gives the older random split, stratified on the label. It
+    mixes days across the sets, so the test set holds transactions from the
+    same days the model learned from, and its scores come out too optimistic.
+
     The test set is touched only once, for the final report.
     """
-    X, y = get_profile(dataset).features(df), df[LABEL]
+    profile = get_profile(dataset)
+    X, y = profile.features(df), df[LABEL]
+    if by_time:
+        train, val, test = _time_cuts(profile.time_order(df), (0.6, 0.8))
+        _check_has_fraud(training=y[train], validation=y[val], test=y[test])
+        return X[train], X[val], X[test], y[train], y[val], y[test]
     X_train, X_rest, y_train, y_rest = train_test_split(
         X, y, test_size=0.4, stratify=y, random_state=random_state
     )
@@ -70,15 +114,22 @@ def split_data(df, dataset=DEFAULT_PROFILE, random_state=42):
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-def split_with_test_file(df, test_df, dataset=DEFAULT_PROFILE, random_state=42):
+def split_with_test_file(df, test_df, dataset=DEFAULT_PROFILE, random_state=42, by_time=True):
     """Use a separate file as the test set, and split the rest 75% train, 25% validation.
 
     The Sparkov dataset ships this way: fraudTest.csv covers the months after
-    fraudTrain.csv, so the test checks the model on later transactions.
+    fraudTrain.csv, so the test checks the model on later transactions. By
+    default the validation set is the latest 25% of the training file, so
+    the threshold is also chosen on transactions after the ones learned from.
     """
     profile = get_profile(dataset)
     X, y = profile.features(df), df[LABEL]
-    X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=0.25, stratify=y, random_state=random_state
-    )
+    if by_time:
+        train, val = _time_cuts(profile.time_order(df), (0.75,))
+        _check_has_fraud(training=y[train], validation=y[val], test=test_df[LABEL])
+        X_train, X_val, y_train, y_val = X[train], X[val], y[train], y[val]
+    else:
+        X_train, X_val, y_train, y_val = train_test_split(
+            X, y, test_size=0.25, stratify=y, random_state=random_state
+        )
     return X_train, X_val, profile.features(test_df), y_train, y_val, test_df[LABEL]
