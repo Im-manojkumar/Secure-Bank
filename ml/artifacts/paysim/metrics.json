@@ -217,6 +217,28 @@
     }
   },
   "best_model": "Random Forest",
+  "test_drift": {
+    "rows": 1293438,
+    "level": "stable",
+    "score_psi": 0.0023,
+    "most_shifted": [
+      {
+        "input": "Hour of day",
+        "psi": 0.0817,
+        "level": "stable"
+      },
+      {
+        "input": "Amount",
+        "psi": 0.0081,
+        "level": "stable"
+      },
+      {
+        "input": "Receiver balance mismatch",
+        "psi": 0.0078,
+        "level": "stable"
+      }
+    ]
+  },
   "other_threshold_rule": {
     "rule": "f1",
     "test": {

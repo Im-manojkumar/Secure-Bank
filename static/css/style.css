@@ -127,6 +127,7 @@ textarea { min-height: 120px; resize: vertical; }
 .message-error { background: color-mix(in srgb, var(--critical) 12%, transparent); color: var(--critical-text); }
 .message-success { background: color-mix(in srgb, var(--good) 12%, transparent); color: var(--good-text); }
 .message-info { background: var(--surface-2); color: var(--text-2); }
+.message-warning { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning-text); }
 
 /* ---- Badges ---- */
 .badge {

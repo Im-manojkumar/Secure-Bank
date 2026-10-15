@@ -59,10 +59,13 @@ class Group:
     describe(values) turns the group's input values (a dict) into words.
     """
 
-    def __init__(self, label, columns, describe, onehot=False):
+    def __init__(self, label, columns, describe, onehot=False, drift=True):
         self.label, self.columns, self.describe = label, columns, describe
         # One-hot groups hold one option set to 1, so their "typical" value is the commonest option.
         self.onehot = onehot
+        # False for inputs that grow with time by design (a clock, a running count), which
+        # would always look shifted in new data; ml/drift.py leaves them out.
+        self.drift = drift
 
 
 class Profile:
@@ -242,7 +245,7 @@ class CreditCard(Profile):
 
     @property
     def groups(self):
-        groups = [Group("Time", ["Time"], lambda v: f"{v['Time']:,.0f} s")]
+        groups = [Group("Time", ["Time"], lambda v: f"{v['Time']:,.0f} s", drift=False)]
         groups += [Group(f"V{i}", [f"V{i}"], lambda v, c=f"V{i}": f"{v[c]:.2f}") for i in range(1, 29)]
         groups.append(Group("Amount", ["Amount"], _money("€")))
         return groups
@@ -378,7 +381,8 @@ class Sparkov(Profile):
               lambda v: f"{v['amount_vs_card_avg']:.1f} times its average"),
         Group("Time since the card's last payment", ["hours_since_last"], _hours_since),
         Group("Card's earlier payments", ["log_card_history"],
-              lambda v: f"{math.expm1(v['log_card_history']):.0f}" + ("+" if v["log_card_history"] >= LOG_HISTORY_CAP else "")),
+              lambda v: f"{math.expm1(v['log_card_history']):.0f}" + ("+" if v["log_card_history"] >= LOG_HISTORY_CAP else ""),
+              drift=False),
     ]
 
     def clean_extra(self, raw, out):

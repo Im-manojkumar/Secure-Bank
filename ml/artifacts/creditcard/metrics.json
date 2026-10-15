@@ -217,6 +217,28 @@
     }
   },
   "best_model": "Gradient Boosting",
+  "test_drift": {
+    "rows": 56746,
+    "level": "stable",
+    "score_psi": 0.0059,
+    "most_shifted": [
+      {
+        "input": "Amount",
+        "psi": 0.041,
+        "level": "stable"
+      },
+      {
+        "input": "V2",
+        "psi": 0.0247,
+        "level": "stable"
+      },
+      {
+        "input": "V21",
+        "psi": 0.0222,
+        "level": "stable"
+      }
+    ]
+  },
   "other_threshold_rule": {
     "rule": "f1",
     "test": {

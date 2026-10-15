@@ -42,6 +42,11 @@
       SB.api(`/api/alerts?status=Open&per_page=8${scope}`),
     ]);
 
+    // Latest imports whose transactions no longer look like the model's training data.
+    $("drift-warnings").replaceChildren(...summary.drift_warnings.map((w) =>
+      SB.el("p", { class: `message message-${w.level === "major" ? "warning" : "info"}`, role: "status" },
+        `${w.source}: ${w.message}`)));
+
     $("t-total").textContent = SB.number(summary.total_transactions);
     $("t-flagged").textContent = SB.number(summary.predicted_fraud);
     $("t-rate").textContent = `${SB.percent(summary.predicted_fraud_rate, 3)} of transactions`;

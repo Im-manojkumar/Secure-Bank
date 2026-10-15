@@ -10,6 +10,7 @@ import pandas as pd
 from flask import current_app
 from sqlalchemy import insert, select
 
+from ml import drift
 from ml.datasets import LABEL, PROFILES, detect_profile
 from models import DataSource, FraudCase, Prediction, Transaction, db, utcnow
 from services import audit
@@ -88,6 +89,7 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
         history = card_history(df["card_id"]) if "card_id" in df.columns else None
         scores, flagged = model.score(df, history)
         flagged_count = int(flagged.sum())
+        source.drift = model.check_drift(df, scores, history)
         explanations = [None] * len(df)
         for i, reasons in zip(flagged.nonzero()[0], model.explain(df[flagged], history)):
             explanations[i] = reasons
@@ -148,9 +150,13 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
         f"Imported {len(df):,} of {received:,} rows as {profile.title}; skipped {invalid:,} invalid and "
         f"{duplicates:,} duplicate rows. Flagged {flagged_count:,} as suspicious."
     )
+    warning = drift.describe(source.drift)
+    if warning:
+        source.message += " " + warning
     audit.record("import_completed", user=user, subject=f"source:{source.id}", details={
         "file": name, "dataset": profile.key, "rows_imported": source.rows_imported,
         "rows_skipped": source.rows_skipped, "flagged": flagged_count,
+        "drift": source.drift["level"] if source.drift else None,
     })
     db.session.commit()
     return source

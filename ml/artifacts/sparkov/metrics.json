@@ -217,6 +217,28 @@
     }
   },
   "best_model": "Gradient Boosting",
+  "test_drift": {
+    "rows": 555719,
+    "level": "stable",
+    "score_psi": 0.0003,
+    "most_shifted": [
+      {
+        "input": "Time since the card's last payment",
+        "psi": 0.0383,
+        "level": "stable"
+      },
+      {
+        "input": "Recent payments on this card",
+        "psi": 0.0125,
+        "level": "stable"
+      },
+      {
+        "input": "Day of week",
+        "psi": 0.0043,
+        "level": "stable"
+      }
+    ]
+  },
   "other_threshold_rule": {
     "rule": "f1",
     "test": {
