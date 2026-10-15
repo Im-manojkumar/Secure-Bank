@@ -11,15 +11,47 @@
         SB.el("td", {}, s.id),
         SB.el("td", {}, s.name),
         SB.el("td", {}, SB.dateTime(s.created_at)),
-        SB.el("td", {}, s.status === "completed"
-          ? SB.el("span", { class: "badge badge-good" }, "✓ Completed")
-          : SB.el("span", { class: "badge badge-critical" }, "✕ Failed")),
+        SB.el("td", {}, statusBadge(s.status)),
         SB.el("td", { class: "num" }, SB.number(s.rows_imported)),
         SB.el("td", { class: "num" }, SB.number(s.rows_skipped)),
-        SB.el("td", { class: "wrap" }, s.message || ""),
+        SB.el("td", { class: "wrap" }, s.message || (RUNNING.includes(s.status) ? progressText(s) : "")),
       )) : [SB.el("tr", {}, SB.el("td", { colspan: 7, class: "empty" }, "Nothing imported yet."))]));
+      // Keep the table current while an import started elsewhere is still running.
+      clearTimeout(historyTimer);
+      if (items.some((s) => RUNNING.includes(s.status))) historyTimer = setTimeout(loadHistory, 3000);
     } catch (error) {
       SB.message($("import-message"), error.message);
+    }
+  }
+
+  const RUNNING = ["queued", "processing"];
+  let historyTimer = null;
+
+  function statusBadge(status) {
+    if (status === "completed") return SB.el("span", { class: "badge badge-good" }, "✓ Completed");
+    if (status === "failed") return SB.el("span", { class: "badge badge-critical" }, "✕ Failed");
+    return SB.el("span", { class: "badge badge-info" }, status === "queued" ? "… Queued" : "↻ Importing");
+  }
+
+  function progressText(s) {
+    if (s.status === "queued") return "Waiting to start…";
+    if (!s.rows_received) return "Reading and checking the file…";
+    if (!s.rows_processed) return `Scoring ${SB.number(s.rows_received)} rows…`;
+    return `Saved ${SB.number(s.rows_processed)} new rows of ${SB.number(s.rows_received)}…`;
+  }
+
+  // Poll an import until it finishes. Returns the finished source.
+  async function follow(id) {
+    for (;;) {
+      const { source } = await SB.api(`/api/sources/${id}`);
+      if (!RUNNING.includes(source.status)) return source;
+      SB.message($("import-message"), progressText(source), "info");
+      if (source.rows_received && source.rows_processed) {
+        progress.value = (source.rows_processed / source.rows_received) * 100;
+      } else {
+        progress.removeAttribute("value");  // An indeterminate bar while reading and scoring.
+      }
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
   }
 
@@ -31,7 +63,7 @@
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/transactions/import");
       xhr.upload.onprogress = (e) => { if (e.lengthComputable) progress.value = (e.loaded / e.total) * 100; };
-      xhr.upload.onload = () => SB.message($("import-message"), "Uploaded. Scoring transactions…", "info");
+      xhr.upload.onload = () => SB.message($("import-message"), "Uploaded. Checking the file…", "info");
       xhr.onload = () => {
         let body = {};
         try { body = JSON.parse(xhr.responseText); } catch (e) { /* not JSON */ }
@@ -54,9 +86,13 @@
     progress.value = 0;
     SB.message($("import-message"), `Uploading ${file.name}…`, "info");
     try {
-      const { source } = await upload(file);
-      SB.message($("import-message"), source.message, "success");
+      let { source } = await upload(file);
       form.reset();
+      loadHistory();
+      // The import runs in the background; the page can be left and the history table shows the result.
+      if (RUNNING.includes(source.status)) source = await follow(source.id);
+      if (source.status === "failed") throw new Error(source.message);
+      SB.message($("import-message"), source.message, "success");
     } catch (error) {
       SB.message($("import-message"), error.message);
     } finally {

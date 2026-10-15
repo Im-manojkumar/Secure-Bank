@@ -137,6 +137,7 @@ textarea { min-height: 120px; resize: vertical; }
 .badge-critical { background: color-mix(in srgb, var(--critical) 14%, transparent); color: var(--critical-text); }
 .badge-warning { background: color-mix(in srgb, var(--warning) 22%, transparent); color: var(--warning-text); }
 .badge-good { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good-text); }
+.badge-info { background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent-text); }
 
 /* ---- Tables ---- */
 .table-wrap { overflow-x: auto; }

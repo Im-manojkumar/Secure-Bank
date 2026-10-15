@@ -48,18 +48,31 @@ sequenceDiagram
     participant Model as FraudModel
     participant DB as SQLite
 
+    participant Worker as Import worker<br/>services/jobs.py
+
     Admin->>Page: choose creditcard.csv
     Page->>API: upload (multipart)
-    API->>Ingest: import_transactions(file)
+    API->>API: check the columns and that a model exists
+    API->>DB: save the file, queue a data_sources row
+    API-->>Page: 202, queued
+    Worker->>DB: claim the oldest queued import
+    Worker->>Ingest: import_transactions(file)
     Ingest->>Ingest: recognise the format from the columns,<br/>drop bad rows, hash rows to find duplicates
     Ingest->>DB: which hashes already exist?
     Ingest->>Model: score all new rows with that format's model
     Ingest->>Model: explain the flagged rows
     Ingest->>Model: compare inputs and scores with the training spread (drift)
-    Ingest->>DB: insert transactions, predictions,<br/>and an Open case per flagged row
-    Ingest->>DB: data_sources row + audit_logs row
-    API-->>Page: rows imported, skipped, flagged
+    loop every 5,000 rows
+        Ingest->>DB: insert transactions, predictions, an Open case per flagged row,<br/>update rows_processed, commit
+    end
+    Ingest->>DB: data_sources result + audit_logs row
+    loop every second until done
+        Page->>API: GET /api/sources/<id>
+        API-->>Page: status and rows_processed
+    end
 ```
+
+The queue is the `data_sources` table, so no extra service such as Redis is needed. A worker claims an import with an update that only succeeds while the row is still `queued`, so two workers never run the same file. The worker is a thread in each web process by default (`IMPORT_MODE=thread`), or a separate `flask import-worker` process in production (`IMPORT_MODE=worker`). Committing every 5,000 rows matters with SQLite, which allows one writer at a time: one long transaction would block every login, since logins write to the audit log.
 
 ## Data model
 
@@ -86,6 +99,8 @@ erDiagram
         string status
         int rows_imported
         int rows_skipped
+        int rows_processed
+        string file_path
     }
     transactions {
         int id

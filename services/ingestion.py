@@ -8,7 +8,7 @@ get an Open fraud case for review, with the inputs that raised their score.
 
 import pandas as pd
 from flask import current_app
-from sqlalchemy import insert, select
+from sqlalchemy import func, insert, select
 
 from ml import drift
 from ml.datasets import LABEL, PROFILES, detect_profile
@@ -23,26 +23,44 @@ class CSVImportError(ValueError):
     """The file cannot be imported at all (wrong format or columns)."""
 
 
-def read_and_validate(file_obj):
-    """Read a CSV. Returns (profile, clean DataFrame, rows received, rows skipped as invalid)."""
+def read_csv(file_obj, **options):
     try:
-        df = pd.read_csv(file_obj)
+        return pd.read_csv(file_obj, **options)
     except (pd.errors.ParserError, pd.errors.EmptyDataError, UnicodeDecodeError) as exc:
         raise CSVImportError(f"Could not read the file as CSV: {exc}") from exc
 
+
+def format_of(df):
+    """The format a CSV's columns match. Raises CSVImportError if none does, or it has no rows."""
     profile, missing = detect_profile(df.columns)
     if len(missing) > len(profile.required_columns) / 2:
         titles = ", ".join(p.title for p in PROFILES.values())
         raise CSVImportError(f"The columns do not match any supported format ({titles}).")
     if missing:
         raise CSVImportError(f"Missing required columns for the {profile.title} format: {', '.join(missing)}")
-
-    received = len(df)
-    if received == 0:
+    if df.empty:
         raise CSVImportError("The file has no rows")
+    return profile
 
+
+def check_file(file_obj):
+    """Check a CSV's columns and first rows before it is queued, and rewind it. Returns its format.
+
+    A wrong file is refused at once rather than after waiting for the import
+    worker; read_and_validate checks every row later.
+    """
+    try:
+        return format_of(read_csv(file_obj, nrows=5))
+    finally:
+        file_obj.seek(0)
+
+
+def read_and_validate(file_obj):
+    """Read a CSV. Returns (profile, clean DataFrame, rows received, rows skipped as invalid)."""
+    df = read_csv(file_obj)
+    profile = format_of(df)
     clean, invalid = profile.clean(df)
-    return profile, clean, received, invalid
+    return profile, clean, len(df), invalid
 
 
 def row_hashes(df, columns):
@@ -58,8 +76,16 @@ def existing_hashes(hashes):
     return found
 
 
-def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
+def import_transactions(file_obj, name, user=None, source_type="csv_upload", source=None):
     """Import a CSV file object. Returns the DataSource row describing the result.
+
+    Pass `source` to fill in a queued import's row (services/jobs.py); otherwise
+    a new one is made. Rows are saved and committed CHUNK_SIZE at a time, with
+    `rows_processed` updated, so the import page can show progress and SQLite's
+    single write lock is never held for long: a one-minute import would
+    otherwise block every login, which also writes, until it finished. If an
+    import fails part-way, the rows already saved stay, and importing the file
+    again adds the rest, because saved rows are skipped as duplicates.
 
     Raises CSVImportError for files that cannot be imported, and ModelNotReady
     if no model has been trained for the file's format yet.
@@ -76,12 +102,14 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
     df = df[~df["_hash"].isin(already)].reset_index(drop=True)
     duplicates = received - invalid - len(df)
 
-    source = DataSource(
-        name=name, source_type=source_type, dataset=profile.key, rows_received=received,
-        imported_by=user.id if user else None,
-    )
-    db.session.add(source)
-    db.session.flush()
+    if source is None:
+        source = DataSource(name=name, source_type=source_type, imported_by=user.id if user else None)
+        db.session.add(source)
+    source.dataset = profile.key
+    source.status = "processing"
+    source.rows_received = received
+    source.rows_processed = 0
+    db.session.commit()
 
     flagged_count = 0
     if len(df):
@@ -142,6 +170,8 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
             ]
             if cases:
                 db.session.execute(insert(FraudCase), cases)
+            source.rows_processed = min(end, len(df))
+            db.session.commit()
 
     source.rows_imported = len(df)
     source.rows_skipped = invalid + duplicates
@@ -162,13 +192,24 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
     return source
 
 
-def record_failed_import(name, message, user=None, source_type="csv_upload"):
-    source = DataSource(
-        name=name, source_type=source_type, status="failed", message=message,
-        imported_by=user.id if user else None,
-    )
-    db.session.add(source)
-    db.session.flush()
+def record_failed_import(name, message, user=None, source_type="csv_upload", source=None):
+    """Mark an import failed (making its DataSource row if it has none) and audit it.
+
+    Call after rolling back. Rows an import saved before it failed are counted
+    and mentioned, since they stay in the database.
+    """
+    if source is None:
+        source = DataSource(name=name, source_type=source_type, imported_by=user.id if user else None)
+        db.session.add(source)
+        db.session.flush()
+    saved = db.session.scalar(select(func.count(Transaction.id)).where(Transaction.source_id == source.id))
+    if saved:
+        message += (f" {saved:,} rows were saved before it stopped; import the file again to add the rest"
+                    " (saved rows are skipped as duplicates).")
+    source.status = "failed"
+    source.message = message
+    source.rows_imported = saved
+    source.file_path = None
     audit.record("import_failed", user=user, subject=f"source:{source.id}", details={"file": name, "error": message})
     db.session.commit()
     return source

@@ -165,6 +165,18 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | DP-10 | `flask backup-db --keep 2` with three older backups | A readable copy of the database; only the two newest backups kept | `test_backup_copies_the_database_and_keeps_the_newest` |
 | DP-11 | `flask backup-db` on an in-memory database | Refused with a message | `test_backup_needs_a_database_file` |
 
+## 7f. Background imports (`tests/test_jobs.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| BG-01 | Upload with `IMPORT_MODE=worker`, then run `flask import-worker --once` | 202 and `queued`, with the file saved and no rows yet; then `completed` with all rows, the file deleted and the import audited under the uploader | `test_upload_is_queued_until_the_worker_runs_it` |
+| BG-02 | Upload a file with a missing column | Refused at once with 400; nothing queued | `test_wrong_files_are_refused_before_queueing` |
+| BG-03 | Analyst opens an import, or one that does not exist | Its status; 404 | `test_anyone_logged_in_can_follow_an_import` |
+| BG-04 | Two queued imports, claimed three times | Oldest first, each once, then nothing | `test_imports_are_claimed_once_oldest_first` |
+| BG-05 | An import with no progress for an hour, and one still running | The first is marked failed ("stopped part-way"); the second is left alone | `test_an_import_cut_off_part_way_is_marked_failed` |
+| BG-06 | An import fails on its third chunk of 100 rows, then the file is imported again | Failed, with the 200 saved rows kept and mentioned; the second import adds the other 300 and skips 200 as duplicates | `test_a_failed_import_keeps_saved_rows_and_can_be_finished` |
+| BG-07 | Upload with `IMPORT_MODE=thread` | 202, then the background thread completes it | `test_thread_mode_imports_in_the_background` |
+
 ## 8. Saved reports and CSV downloads (`tests/test_reports.py`)
 
 | ID | Case | Expected result | Test |
@@ -195,7 +207,7 @@ These were run in Chromium against the full Kaggle dataset (283,726 transactions
 | UI-04 | Open an alert, choose Resolved without an outcome, then save | "Choose an outcome before resolving the case." |
 | UI-05 | Choose an outcome, type notes containing `<script>`, then save | "Review saved." The notes show as plain text and nothing runs. |
 | UI-06 | Check a transaction, starting from transaction 542 | Values filled in, then "Low risk" with its score and the threshold marker |
-| UI-07 | As an admin, upload a CSV on the Import page | Progress bar, then the result message and a new history row |
+| UI-07 | As an admin, upload a 60,000-row CSV on the Import page | Upload progress, then "Scoring 60,000 rows…" and "Saved 20,000 new rows of 60,000…" while the history row shows Importing, then the result message; no console errors |
 | UI-08 | Open the Audit log as an admin | Every action above listed, and case entries link to the case |
 | UI-09 | Repeat UI-01 with the system set to dark mode | Readable dark theme |
 | UI-10 | Use a 390 px wide phone screen | No sideways scrolling, and the menu scrolls on one line |
@@ -206,4 +218,4 @@ These were run in Chromium against the full Kaggle dataset (283,726 transactions
 
 Two-factor login was checked in Chromium: an admin without it lands on the Account page and is sent back there from other pages; after adding the key to an app and entering a code, the dashboard opens; on the next login the page asks for the code and then logs in.
 
-The Docker setup was checked by building the image and running it behind Caddy: the app refused to start without its keys, then reported healthy as a non-root user; login over HTTPS set a `Secure` cookie with `Strict-Transport-Security`; the audit log recorded the visitor's address rather than Caddy's; and `flask backup-db` wrote a copy to the data volume.
+The Docker setup was checked by building the image and running it behind Caddy: the app refused to start without its keys, then reported healthy as a non-root user; login over HTTPS set a `Secure` cookie with `Strict-Transport-Security`; the audit log recorded the visitor's address rather than Caddy's; and `flask backup-db` wrote a copy to the data volume. With the import worker added, the full `docker compose` stack was run too: a 60,000-row upload over HTTPS answered 202 in half a second, the worker container imported it, and the queued file was deleted.

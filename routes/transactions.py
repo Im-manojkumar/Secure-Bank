@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy import select
 
@@ -10,8 +10,9 @@ from ml.datasets import DEFAULT_PROFILE, PROFILES
 from models import DataSource, Transaction, db
 from routes.auth import role_required
 from routes.pagination import paginate
-from services.ingestion import CSVImportError, import_transactions, record_failed_import
-from services.prediction import ModelNotReady, describe_models, predict_one
+from services.ingestion import CSVImportError, check_file, record_failed_import
+from services.jobs import ensure_worker, queue_import
+from services.prediction import ModelNotReady, describe_models, get_model, predict_one
 from services.search import FilterError, clean_filters, transaction_query
 
 bp = Blueprint("transactions", __name__, url_prefix="/api")
@@ -28,27 +29,42 @@ def import_csv():
         return jsonify(error="Only .csv files can be imported."), 400
 
     try:
-        source = import_transactions(upload.stream, name, current_user)
+        profile = check_file(upload.stream)
+        get_model(profile.key)
     except ModelNotReady as exc:
-        db.session.rollback()
         return jsonify(error=str(exc)), 503
     except CSVImportError as exc:
         db.session.rollback()
         source = record_failed_import(name, str(exc), current_user)
         return jsonify(error=str(exc), source=source.to_dict()), 400
-    except Exception:
-        db.session.rollback()
-        current_app.logger.exception("Import of %s failed", name)
-        source = record_failed_import(name, "Unexpected error during import.", current_user)
-        return jsonify(error="The import failed unexpectedly.", source=source.to_dict()), 500
-    return jsonify(source=source.to_dict()), 201
+
+    # The worker imports it; the page polls GET /api/sources/<id> for progress.
+    source = queue_import(upload, name, profile, current_user)
+    ensure_worker()
+    db.session.refresh(source)
+    if source.status == "failed":
+        return jsonify(error=source.message, source=source.to_dict()), 400
+    return jsonify(source=source.to_dict()), 201 if source.status == "completed" else 202
 
 
 @bp.get("/sources")
 @login_required
 def list_sources():
     sources = db.session.scalars(select(DataSource).order_by(DataSource.created_at.desc())).all()
+    if any(s.status == "queued" for s in sources):
+        # Imports queued before a restart get a worker when someone opens the import page.
+        ensure_worker()
     return jsonify(items=[s.to_dict() for s in sources])
+
+
+@bp.get("/sources/<int:source_id>")
+@login_required
+def get_source(source_id):
+    """One import, for following its progress."""
+    source = db.session.get(DataSource, source_id)
+    if source is None:
+        return jsonify(error="Import not found."), 404
+    return jsonify(source=source.to_dict())
 
 
 @bp.get("/transactions")

@@ -23,6 +23,12 @@ class Config:
 
     # Uploads: the full Kaggle file is ~150 MB.
     MAX_CONTENT_LENGTH = 200 * 1024 * 1024
+    # Uploaded files wait here until they are imported, then are deleted.
+    UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", BASE_DIR / "instance" / "uploads"))
+    # Who imports uploaded files (services/jobs.py): "thread" runs a background thread in
+    # the web process; "worker" leaves it to a separate `flask import-worker` process;
+    # "inline" imports during the upload request, as tests do.
+    IMPORT_MODE = os.environ.get("IMPORT_MODE", "thread")
 
     # The Kaggle dataset's Time column counts seconds from its first transaction,
     # which the dataset authors place in September 2013. Times are stored as UTC.
@@ -53,3 +59,4 @@ class TestConfig(Config):
     REQUIRE_2FA_FOR_ADMINS = False
     SECRET_KEY = "test-secret"
     SQLALCHEMY_DATABASE_URI = "sqlite://"
+    IMPORT_MODE = "inline"

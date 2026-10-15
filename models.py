@@ -73,15 +73,22 @@ class DataSource(db.Model):
     source_type = db.Column(db.String(50), nullable=False, default="csv_upload")
     # The file's format (a key in ml/datasets.py), which decides the model that scores it.
     dataset = db.Column(db.String(30), nullable=False, default="creditcard", index=True)
+    # queued -> processing -> completed or failed (see services/jobs.py).
     status = db.Column(db.String(20), nullable=False, default="processing")
     rows_received = db.Column(db.Integer, default=0)
+    # Rows saved so far while an import runs, so the import page can show progress.
+    rows_processed = db.Column(db.Integer)
     rows_imported = db.Column(db.Integer, default=0)
     rows_skipped = db.Column(db.Integer, default=0)
     message = db.Column(db.Text)
     # How far the file's transactions drifted from the model's training data (ml/drift.py).
     drift = db.Column(JSON)
     imported_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    # Where a queued upload waits on disk until the import worker reads it.
+    file_path = db.Column(db.String(255))
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    # Last progress; an import that stops updating this was cut off (see services/jobs.py).
+    updated_at = db.Column(db.DateTime, default=utcnow, onupdate=utcnow)
 
     def to_dict(self):
         return {
@@ -91,6 +98,7 @@ class DataSource(db.Model):
             "dataset": self.dataset,
             "status": self.status,
             "rows_received": self.rows_received,
+            "rows_processed": self.rows_processed,
             "rows_imported": self.rows_imported,
             "rows_skipped": self.rows_skipped,
             "message": self.message,
