@@ -1,5 +1,7 @@
 {
   "split": "time",
+  "threshold_rule": "cost",
+  "review_cost": 10.0,
   "validation": {
     "Logistic Regression": {
       "threshold": 0.999998,
@@ -13,6 +15,13 @@
         "fp": 1,
         "fn": 17,
         "tp": 40
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 41,
+        "fraud_caught_amount": 7754.23,
+        "fraud_missed_amount": 4476.86,
+        "total_cost": 4886.86
       }
     },
     "Decision Tree": {
@@ -27,48 +36,76 @@
         "fp": 27,
         "fn": 18,
         "tp": 39
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 66,
+        "fraud_caught_amount": 6494.54,
+        "fraud_missed_amount": 5736.55,
+        "total_cost": 6396.55
       }
     },
     "Random Forest": {
-      "threshold": 0.527018,
-      "precision": 0.9556,
-      "recall": 0.7544,
-      "f1": 0.8431,
+      "threshold": 0.545516,
+      "precision": 0.9545,
+      "recall": 0.7368,
+      "f1": 0.8317,
       "pr_auc": 0.7473,
       "roc_auc": 0.9556,
       "confusion_matrix": {
         "tn": 56686,
         "fp": 2,
-        "fn": 14,
-        "tp": 43
+        "fn": 15,
+        "tp": 42
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 44,
+        "fraud_caught_amount": 7756.23,
+        "fraud_missed_amount": 4474.86,
+        "total_cost": 4914.86
       }
     },
     "SVM (linear)": {
-      "threshold": 1.751349,
-      "precision": 0.6032,
-      "recall": 0.6667,
-      "f1": 0.6333,
+      "threshold": 1.461167,
+      "precision": 0.5185,
+      "recall": 0.7368,
+      "f1": 0.6087,
       "pr_auc": 0.5723,
       "roc_auc": 0.9664,
       "confusion_matrix": {
-        "tn": 56663,
-        "fp": 25,
-        "fn": 19,
-        "tp": 38
+        "tn": 56649,
+        "fp": 39,
+        "fn": 15,
+        "tp": 42
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 81,
+        "fraud_caught_amount": 7716.0,
+        "fraud_missed_amount": 4515.09,
+        "total_cost": 5325.09
       }
     },
     "Gradient Boosting": {
-      "threshold": 0.513582,
-      "precision": 0.9556,
-      "recall": 0.7544,
-      "f1": 0.8431,
+      "threshold": 0.767493,
+      "precision": 0.9762,
+      "recall": 0.7193,
+      "f1": 0.8283,
       "pr_auc": 0.7918,
       "roc_auc": 0.9647,
       "confusion_matrix": {
-        "tn": 56686,
-        "fp": 2,
-        "fn": 14,
-        "tp": 43
+        "tn": 56687,
+        "fp": 1,
+        "fn": 16,
+        "tp": 41
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 42,
+        "fraud_caught_amount": 7755.23,
+        "fraud_missed_amount": 4475.86,
+        "total_cost": 4895.86
       }
     }
   },
@@ -85,6 +122,13 @@
         "fp": 3,
         "fn": 25,
         "tp": 49
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 52,
+        "fraud_caught_amount": 4390.99,
+        "fraud_missed_amount": 3336.68,
+        "total_cost": 3856.68
       }
     },
     "Decision Tree": {
@@ -99,10 +143,17 @@
         "fp": 28,
         "fn": 21,
         "tp": 53
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 81,
+        "fraud_caught_amount": 3840.37,
+        "fraud_missed_amount": 3887.3,
+        "total_cost": 4697.3
       }
     },
     "Random Forest": {
-      "threshold": 0.527018,
+      "threshold": 0.545516,
       "precision": 0.9153,
       "recall": 0.7297,
       "f1": 0.812,
@@ -113,23 +164,62 @@
         "fp": 5,
         "fn": 20,
         "tp": 54
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 59,
+        "fraud_caught_amount": 5079.35,
+        "fraud_missed_amount": 2648.32,
+        "total_cost": 3238.32
       }
     },
     "SVM (linear)": {
-      "threshold": 1.751349,
-      "precision": 0.6857,
-      "recall": 0.6486,
-      "f1": 0.6667,
+      "threshold": 1.461167,
+      "precision": 0.587,
+      "recall": 0.7297,
+      "f1": 0.6506,
       "pr_auc": 0.6488,
       "roc_auc": 0.9798,
       "confusion_matrix": {
-        "tn": 56650,
-        "fp": 22,
-        "fn": 26,
-        "tp": 48
+        "tn": 56634,
+        "fp": 38,
+        "fn": 20,
+        "tp": 54
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 92,
+        "fraud_caught_amount": 4726.21,
+        "fraud_missed_amount": 3001.46,
+        "total_cost": 3921.46
       }
     },
     "Gradient Boosting": {
+      "threshold": 0.767493,
+      "precision": 0.8929,
+      "recall": 0.6757,
+      "f1": 0.7692,
+      "pr_auc": 0.7849,
+      "roc_auc": 0.9676,
+      "confusion_matrix": {
+        "tn": 56666,
+        "fp": 6,
+        "fn": 24,
+        "tp": 50
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 56,
+        "fraud_caught_amount": 3758.1,
+        "fraud_missed_amount": 3969.57,
+        "total_cost": 4529.57
+      }
+    }
+  },
+  "best_model": "Gradient Boosting",
+  "other_threshold_rule": {
+    "rule": "f1",
+    "test": {
       "threshold": 0.513582,
       "precision": 0.8667,
       "recall": 0.7027,
@@ -141,8 +231,14 @@
         "fp": 8,
         "fn": 22,
         "tp": 52
+      },
+      "cost": {
+        "review_cost": 10.0,
+        "alerts": 60,
+        "fraud_caught_amount": 4051.47,
+        "fraud_missed_amount": 3676.2,
+        "total_cost": 4276.2
       }
     }
-  },
-  "best_model": "Gradient Boosting"
+  }
 }
