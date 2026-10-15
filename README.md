@@ -71,6 +71,16 @@ Sparkov and PaySim take about 5 to 10 minutes each and need a few GB of memory, 
 
 Pass `--no-smote` to use class weights instead of SMOTE.
 
+### Learning from analysts
+
+Every case an analyst resolves as **Confirmed fraud** or **Legitimate** is a label the model can learn from, and the most useful ones are its own mistakes. Retrain with those verdicts added to the training data:
+
+```bash
+flask --app app retrain --dataset sparkov --data data/raw/fraudTrain.csv --test-data data/raw/fraudTest.csv
+```
+
+The reviewed transactions join the training set only. Any that are also validation or test rows are skipped, so the reported scores stay honest. The current model is first copied to `ml/artifacts/<format>/previous/<trained_at>/`, so it can be put back. The retrain is written to the audit log, and `model_meta.json` records how many reviewed cases it learned from. Restart the app to start scoring with the new model.
+
 ### Why not accuracy?
 
 Fraud is under 1% of every dataset, so a model that calls everything legitimate would still be over 99% accurate. These metrics are reported instead:
@@ -273,12 +283,12 @@ Before running anywhere other than your own machine:
 pytest
 ```
 
-There are 127 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
+There are 131 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
 
 ## Project layout
 
 ```
-app.py            Flask app factory and CLI commands (init-db, create-user, import-csv)
+app.py            Flask app factory and CLI commands (init-db, create-user, import-csv, retrain)
 config.py         settings, overridable with environment variables
 models.py         database tables
 routes/           API endpoints (auth, transactions, alerts, reports, dashboard, audit) and HTML pages (pages.py)
