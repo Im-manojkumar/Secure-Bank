@@ -11,13 +11,29 @@ ml/artifacts/<key>/.
     paysim      Simulated mobile money transfers (Kaggle "PaySim")
 """
 
+import hashlib
+import hmac
 import math
+import os
 from datetime import datetime, timedelta
 
 import numpy as np
 import pandas as pd
 
 LABEL = "label"  # The cleaned label column, whatever the file called it.
+
+# Card numbers are never stored. To link a card's payments together, each number is
+# turned into a card_id with a keyed hash, so the stored ID cannot be turned back into
+# the number without the key. Set CARD_ID_KEY to a long random value in production;
+# changing it later breaks the link between old and new payments of the same card.
+CARD_ID_KEY = os.environ.get("CARD_ID_KEY", "securebank-development-card-key").encode()
+
+
+def card_ids(numbers):
+    """A 16-character ID per card number, the same every time for the same card."""
+    return numbers.astype(str).str.strip().map(
+        lambda n: hmac.new(CARD_ID_KEY, n.encode(), hashlib.sha256).hexdigest()[:16]
+    )
 
 
 class Field:
@@ -54,12 +70,17 @@ class Profile:
     target = None              # label column in the raw file, optional when importing
     fields = []                # raw inputs: required in a file, stored with each transaction
     optional = []              # raw columns stored when a file has them, never model inputs
+    raw_only = []              # required in a file but never stored as they are (e.g. card numbers)
     readable = True            # False when the inputs have no plain meaning (anonymised)
     amount_feature = "amount"  # model input holding the transaction amount, for costs
 
     @property
-    def required_columns(self):
+    def field_names(self):
         return [f.name for f in self.fields]
+
+    @property
+    def required_columns(self):
+        return self.field_names + self.raw_only
 
     @property
     def feature_names(self):
@@ -99,7 +120,7 @@ class Profile:
     def parse_input(self, payload):
         """Validate one transaction typed into the Check form. Returns (row, errors)."""
         if not isinstance(payload, dict):
-            return None, ["Body must be a JSON object with the fields " + ", ".join(self.required_columns)]
+            return None, ["Body must be a JSON object with the fields " + ", ".join(self.field_names)]
         row, errors = {}, []
         for field in self.fields:
             value, error = _parse_value(payload.get(field.name), field)
@@ -109,7 +130,12 @@ class Profile:
                 row[field.name] = value
         return row, errors
 
-    def features(self, df):
+    def features(self, df, history=None):
+        """The model's inputs for each row of df.
+
+        history holds earlier transactions (same columns as df) that are not
+        being scored but count as past behaviour, for formats that use it.
+        """
         raise NotImplementedError
 
     def amounts(self, df):
@@ -221,8 +247,8 @@ class CreditCard(Profile):
         groups.append(Group("Amount", ["Amount"], _money("€")))
         return groups
 
-    def features(self, df):
-        return df[self.required_columns].astype(float)
+    def features(self, df, history=None):
+        return df[self.field_names].astype(float)
 
     def amounts(self, df):
         return df["Amount"].to_numpy(dtype=float)
@@ -234,6 +260,72 @@ class CreditCard(Profile):
 
     def time_order(self, df):
         return df["Time"].astype(float)
+
+
+# Hours since a card's last payment, when it has none or the gap is longer than this.
+MAX_GAP_HOURS = 24 * 30
+# Past this many earlier payments a card counts as well established.
+LOG_HISTORY_CAP = math.log1p(100)
+
+
+def _hours_since(v):
+    hours = v["hours_since_last"]
+    if hours >= MAX_GAP_HOURS:
+        return "no payment in the past 30 days"
+    return f"{hours * 60:.0f} minutes" if hours < 1 else f"{hours:.1f} hours"
+
+
+def card_history(df, history=None):
+    """How each payment compares with the same card's earlier payments.
+
+    Uses only payments before each one, in time order, so nothing from the
+    future leaks in. history adds earlier payments that are not being scored
+    (from the database, or the training file when scoring the test file).
+    Rows without a card_id are treated as a card's first payment.
+    """
+    rows = pd.DataFrame({
+        "card": (df["card_id"] if "card_id" in df.columns else pd.Series(None, index=df.index)).astype(object),
+        "when": pd.to_datetime(df["trans_date_trans_time"]),
+        "amt": df["amt"].astype(float),
+        "scored": True,
+    }, index=df.index)
+    # A missing card is its own card, so it gets no history.
+    missing = rows["card"].isna()
+    rows.loc[missing, "card"] = [f"_none{i}" for i in range(int(missing.sum()))]
+    if history is not None and len(history) and "card_id" in history.columns:
+        past = history[history["card_id"].isin(set(rows["card"]))]
+        rows = pd.concat([rows, pd.DataFrame({
+            "card": past["card_id"].to_numpy(),
+            "when": pd.to_datetime(past["trans_date_trans_time"]).to_numpy(),
+            "amt": past["amt"].astype(float).to_numpy(),
+            "scored": False,
+        })])
+    rows["row"] = np.arange(len(rows))
+    rows = rows.sort_values(["card", "when", "row"], kind="mergesort")
+
+    card_code = pd.factorize(rows["card"])[0].astype(np.int64)
+    # Whole seconds from the earliest payment (pandas may store times in s, us or ns).
+    seconds = (rows["when"] - rows["when"].min()).dt.total_seconds().fillna(0).to_numpy().astype(np.int64)
+    # One sorted key per row (card first, then time), so a window search stays inside the card.
+    key = card_code * (1 << 34) + seconds
+    position = np.arange(len(rows))
+
+    grouped = rows.groupby("card", sort=False)
+    earlier = grouped.cumcount().to_numpy()
+    earlier_total = grouped["amt"].cumsum().to_numpy() - rows["amt"].to_numpy()
+    previous = grouped["when"].shift()
+    gap = ((rows["when"] - previous).dt.total_seconds() / 3600).to_numpy()
+
+    out = pd.DataFrame({
+        "card_txn_1h": position - np.searchsorted(key, key - 3600, side="left"),
+        "card_txn_24h": position - np.searchsorted(key, key - 86400, side="left"),
+        "amount_vs_card_avg": np.where(
+            earlier > 0, rows["amt"].to_numpy() / np.maximum(earlier_total / np.maximum(earlier, 1), 1.0), 1.0
+        ),
+        "hours_since_last": np.minimum(np.nan_to_num(gap, nan=MAX_GAP_HOURS), MAX_GAP_HOURS),
+        "log_card_history": np.minimum(np.log1p(earlier), LOG_HISTORY_CAP),
+    }, index=rows.index).astype(float)
+    return out[rows["scored"].to_numpy()].loc[df.index]
 
 
 # --- Sparkov simulated card transactions ---------------------------------------
@@ -269,6 +361,8 @@ class Sparkov(Profile):
     # Names, street, job, gender and the full card number are never stored. Gender is
     # left out of the model on purpose: a fraud score must not depend on it.
     optional = ["merchant", "city", "state", "trans_num"]
+    # The card number links a card's payments; only its keyed hash (card_id) is kept.
+    raw_only = ["cc_num"]
 
     groups = [
         Group("Amount", ["amount", "log_amount"], _money("$")),
@@ -278,6 +372,13 @@ class Sparkov(Profile):
         Group("City population", ["log_city_pop"], lambda v: f"{math.expm1(v['log_city_pop']):,.0f}"),
         Group("Distance to merchant", ["distance_km"], lambda v: f"{v['distance_km']:,.0f} km"),
         Group("Merchant category", [f"cat_{c}" for c in SPARKOV_CATEGORIES], _onehot("cat_", SPARKOV_CATEGORIES), onehot=True),
+        Group("Recent payments on this card", ["card_txn_1h", "card_txn_24h"],
+              lambda v: f"{v['card_txn_1h']:.0f} in the hour before, {v['card_txn_24h']:.0f} in the day before"),
+        Group("Amount against the card's usual", ["amount_vs_card_avg"],
+              lambda v: f"{v['amount_vs_card_avg']:.1f} times its average"),
+        Group("Time since the card's last payment", ["hours_since_last"], _hours_since),
+        Group("Card's earlier payments", ["log_card_history"],
+              lambda v: f"{math.expm1(v['log_card_history']):.0f}" + ("+" if v["log_card_history"] >= LOG_HISTORY_CAP else "")),
     ]
 
     def clean_extra(self, raw, out):
@@ -286,8 +387,9 @@ class Sparkov(Profile):
             out["merchant"] = out["merchant"].str.removeprefix("fraud_")
         if "cc_num" in raw.columns:
             out["card_last4"] = raw["cc_num"].astype(str).str.strip().str[-4:]
+            out["card_id"] = card_ids(raw["cc_num"])
 
-    def features(self, df):
+    def features(self, df, history=None):
         when = pd.to_datetime(df["trans_date_trans_time"])
         born = pd.to_datetime(df["dob"])
         amount = df["amt"].astype(float)
@@ -304,6 +406,7 @@ class Sparkov(Profile):
         }, index=df.index)
         for c in SPARKOV_CATEGORIES:
             out[f"cat_{c}"] = (df["category"] == c).astype(float)
+        out = out.join(card_history(df, history))
         return out[self.feature_names]
 
     def amounts(self, df):
@@ -358,7 +461,7 @@ class PaySim(Profile):
         Group("Hour of day", ["hour"], lambda v: f"{int(v['hour']):02d}:00"),
     ]
 
-    def features(self, df):
+    def features(self, df, history=None):
         amount = df["amount"].astype(float)
         out = pd.DataFrame({
             "amount": amount,

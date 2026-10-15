@@ -132,4 +132,5 @@ def split_with_test_file(df, test_df, dataset=DEFAULT_PROFILE, random_state=42, 
         X_train, X_val, y_train, y_val = train_test_split(
             X, y, test_size=0.25, stratify=y, random_state=random_state
         )
-    return X_train, X_val, profile.features(test_df), y_train, y_val, test_df[LABEL]
+    # The training file's payments count as each card's history when scoring the test file.
+    return X_train, X_val, profile.features(test_df, history=df), y_train, y_val, test_df[LABEL]

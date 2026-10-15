@@ -235,3 +235,23 @@ def test_duplicate_check_ignores_number_formatting(app, admin):
     admin.post("/api/transactions/import", data=csv_upload(as_float), content_type="multipart/form-data")
     response = admin.post("/api/transactions/import", data=csv_upload(as_int), content_type="multipart/form-data")
     assert response.get_json()["source"]["rows_imported"] == 0
+
+
+def test_init_db_adds_columns_missing_from_an_older_database(tmp_path):
+    import sqlalchemy
+    from app import add_missing_columns, create_app
+    from config import TestConfig
+
+    class FileConfig(TestConfig):
+        SQLALCHEMY_DATABASE_URI = f"sqlite:///{tmp_path / 'old.db'}"
+
+    app = create_app(FileConfig)
+    with app.app_context():
+        db.create_all()
+        with db.engine.begin() as conn:  # make it look like a database from before card_id existed
+            conn.execute(sqlalchemy.text("DROP INDEX ix_transactions_card_id"))
+            conn.execute(sqlalchemy.text("ALTER TABLE transactions DROP COLUMN card_id"))
+        add_missing_columns()
+        columns = {c["name"] for c in sqlalchemy.inspect(db.engine).get_columns("transactions")}
+        assert "card_id" in columns
+        add_missing_columns()  # running it again changes nothing

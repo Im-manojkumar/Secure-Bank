@@ -52,7 +52,8 @@ def make_sparkov_sample(rows=20000, fraud_rate=0.01, random_state=0):
     dob = pd.Timestamp("1950-01-01") + pd.to_timedelta(rng.integers(0, 50 * 365, rows), unit="D")
     return pd.DataFrame({
         "trans_date_trans_time": when.strftime("%Y-%m-%d %H:%M:%S"),
-        "cc_num": rng.integers(10**15, 10**16, rows),
+        # 200 cards, so each card has a history of earlier payments.
+        "cc_num": rng.choice(rng.integers(10**15, 10**16, 200), rows),
         "merchant": [f"fraud_Shop {i % 500}" for i in range(rows)],
         "category": category,
         "amt": amount,

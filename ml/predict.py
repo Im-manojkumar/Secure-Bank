@@ -25,17 +25,20 @@ class FraudModel:
         self.profile = get_profile(self.meta.get("dataset", DEFAULT_PROFILE))
         self.threshold = self.meta["threshold"]
 
-    def _inputs(self, df):
-        missing = [c for c in self.profile.required_columns if c not in df.columns]
+    def _inputs(self, df, history=None):
+        missing = [c for c in self.profile.field_names if c not in df.columns]
         if missing:
             raise ValueError(f"Missing columns: {', '.join(missing)}")
-        return self.profile.features(df)
+        return self.profile.features(df, history)
 
-    def score(self, df):
-        """Return (scores, is_suspicious) arrays for the rows of df."""
-        scores = fraud_scores(self.pipeline, self._inputs(df))
+    def score(self, df, history=None):
+        """Return (scores, is_suspicious) arrays for the rows of df.
+
+        history: earlier transactions of the same cards, for formats that use them.
+        """
+        scores = fraud_scores(self.pipeline, self._inputs(df, history))
         return scores, scores >= self.threshold
 
-    def explain(self, df, top=3):
+    def explain(self, df, history=None, top=3):
         """For each row, the inputs that raised its score most (see ml/explain.py)."""
-        return explain(self.pipeline, self.profile, self._inputs(df), self.meta["baseline"], top)
+        return explain(self.pipeline, self.profile, self._inputs(df, history), self.meta["baseline"], top)

@@ -13,7 +13,7 @@ from sqlalchemy import insert, select
 from ml.datasets import LABEL, PROFILES, detect_profile
 from models import DataSource, FraudCase, Prediction, Transaction, db, utcnow
 from services import audit
-from services.prediction import get_model, model_version
+from services.prediction import card_history, get_model, model_version
 
 CHUNK_SIZE = 5000
 
@@ -84,10 +84,12 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
 
     flagged_count = 0
     if len(df):
-        scores, flagged = model.score(df)
+        # Earlier stored payments of the same cards, so each payment is compared with its card's past.
+        history = card_history(df["card_id"]) if "card_id" in df.columns else None
+        scores, flagged = model.score(df, history)
         flagged_count = int(flagged.sum())
         explanations = [None] * len(df)
-        for i, reasons in zip(flagged.nonzero()[0], model.explain(df[flagged])):
+        for i, reasons in zip(flagged.nonzero()[0], model.explain(df[flagged], history)):
             explanations[i] = reasons
         now = utcnow()
 
@@ -98,6 +100,7 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
         row_numbers = df["_row"].to_numpy()
         hashes = df["_hash"].to_numpy()
         labels = df[LABEL].to_numpy() if LABEL in df.columns else [None] * len(df)
+        cards = df["card_id"].to_numpy() if "card_id" in df.columns else [None] * len(df)
 
         for start in range(0, len(df), CHUNK_SIZE):
             end = start + CHUNK_SIZE
@@ -111,6 +114,7 @@ def import_transactions(file_obj, name, user=None, source_type="csv_upload"):
                     "features": records[i],
                     "dataset_label": None if labels[i] is None or pd.isna(labels[i]) else int(labels[i]),
                     "row_hash": hashes[i],
+                    "card_id": cards[i],
                     "created_at": now,
                 }
                 for i in range(start, min(end, len(df)))

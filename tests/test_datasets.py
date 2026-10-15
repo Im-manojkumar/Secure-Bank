@@ -3,7 +3,7 @@
 import pandas as pd
 import pytest
 
-from ml.datasets import LABEL, detect_profile, get_profile
+from ml.datasets import LABEL, card_history, card_ids, detect_profile, get_profile
 from ml.predict import FraudModel
 from ml.sample_data import make_paysim_sample, make_sample, make_sparkov_sample
 from models import DataSource, Transaction, db
@@ -55,6 +55,40 @@ def test_paysim_features_include_balance_mismatches():
     assert X.loc[0, "type_TRANSFER"] == 1
 
 
+def test_card_history_counts_only_earlier_payments_of_the_same_card():
+    df = pd.DataFrame({
+        "card_id": ["a", "a", "a", "b", "a"],
+        "trans_date_trans_time": ["2020-01-01 10:00:00", "2020-01-01 10:30:00", "2020-01-01 12:00:00",
+                                  "2020-01-01 10:10:00", "2020-01-03 12:00:00"],
+        "amt": [10.0, 20.0, 90.0, 5.0, 30.0],
+    })
+    h = card_history(df)
+    assert h["card_txn_1h"].tolist() == [0, 1, 0, 0, 0]
+    assert h["card_txn_24h"].tolist() == [0, 1, 2, 0, 0]
+    assert h["hours_since_last"].tolist() == [720, 0.5, 1.5, 720, 48]
+    assert h.loc[2, "amount_vs_card_avg"] == 6.0  # 90 against an average of 15
+    assert h.loc[3, "amount_vs_card_avg"] == 1.0  # first payment of card b
+
+
+def test_card_history_uses_earlier_payments_that_are_not_scored():
+    row = pd.DataFrame({"card_id": ["a"], "trans_date_trans_time": ["2020-01-01 12:00:00"], "amt": [90.0]})
+    past = pd.DataFrame({
+        "card_id": ["a", "a", "z"],
+        "trans_date_trans_time": ["2020-01-01 11:50:00", "2020-01-02 09:00:00", "2020-01-01 11:55:00"],
+        "amt": [30.0, 999.0, 1.0],
+    })
+    h = card_history(row, past)
+    # Card z and card a's later payment do not count.
+    assert h.loc[0, "card_txn_1h"] == 1 and h.loc[0, "amount_vs_card_avg"] == 3.0
+    assert abs(h.loc[0, "hours_since_last"] - 1 / 6) < 1e-9
+
+
+def test_card_ids_are_stable_and_hide_the_number():
+    ids = card_ids(pd.Series(["4111111111111111", " 4111111111111111", "5500000000000004"]))
+    assert ids[0] == ids[1] != ids[2]
+    assert len(ids[0]) == 16 and "4111" not in ids[0]
+
+
 def test_each_format_trains_its_own_model(model_dir):
     for key in ("creditcard", "sparkov", "paysim"):
         model = FraudModel(model_dir / key)
@@ -94,7 +128,8 @@ def test_import_scores_each_format_with_its_model(app, admin, maker, key, curren
     items = admin.get(f"/api/transactions?dataset={key}&prediction=suspicious&per_page=100").get_json()["items"]
     assert items and all(t["dataset"] == key and t["currency"] == currency for t in items)
     detail = admin.get(f"/api/transactions/{items[0]['id']}").get_json()["transaction"]
-    assert set(get_profile(key).required_columns) <= set(detail["features"])
+    assert set(get_profile(key).field_names) <= set(detail["features"])
+    assert "cc_num" not in detail["features"]  # card numbers are never stored
     assert detail["prediction"]["explanation"], "suspicious rows store why they were flagged"
 
     alerts = admin.get("/api/alerts?per_page=5").get_json()["items"]
@@ -103,6 +138,27 @@ def test_import_scores_each_format_with_its_model(app, admin, maker, key, curren
     # Re-importing the same file adds nothing.
     again = import_csv(admin, maker(rows=300, fraud_rate=0.1, random_state=4), f"{key}.csv").get_json()["source"]
     assert again["rows_imported"] == 0
+
+
+def test_import_compares_payments_with_the_card_history_already_stored(app, admin):
+    from services.prediction import card_history as stored_history
+
+    sample = make_sparkov_sample(rows=300, fraud_rate=0.05, random_state=11)
+    sample["trans_date_trans_time"] = pd.to_datetime(sample["trans_date_trans_time"])
+    sample = sample.sort_values("trans_date_trans_time")
+    sample["trans_date_trans_time"] = sample["trans_date_trans_time"].dt.strftime("%Y-%m-%d %H:%M:%S")
+    first, second = sample.iloc[:200], sample.iloc[200:]
+    assert import_csv(admin, first, "first.csv").status_code == 201
+
+    with app.app_context():
+        cards = card_ids(second["cc_num"]).tolist()
+        history = stored_history(cards)
+        assert len(history) and set(history["card_id"]) <= set(cards)
+        assert db.session.query(Transaction).filter(Transaction.card_id.is_(None)).count() == 0
+
+    assert import_csv(admin, second, "second.csv").status_code == 201
+    with app.app_context():
+        assert db.session.query(Transaction).count() == 300
 
 
 def test_low_risk_rows_store_no_explanation(app, admin):

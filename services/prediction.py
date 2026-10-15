@@ -5,9 +5,13 @@ Each dataset format has its own model, saved under MODEL_DIR/<dataset>/.
 
 import pandas as pd
 from flask import current_app
+from sqlalchemy import select
 
 from ml.datasets import DEFAULT_PROFILE, PROFILES, get_profile
 from ml.predict import FraudModel
+from models import Transaction, db
+
+HISTORY_CHUNK = 500
 
 
 class ModelNotReady(RuntimeError):
@@ -26,6 +30,24 @@ def get_model(dataset=DEFAULT_PROFILE):
                 f"Run `python -m ml.train --dataset {dataset}` first."
             ) from None
     return models[dataset]
+
+
+def card_history(card_ids):
+    """Stored payments of these cards, in the columns the card-history features read.
+
+    Returns None when there are no cards to look up.
+    """
+    card_ids = [c for c in dict.fromkeys(card_ids) if isinstance(c, str)]
+    if not card_ids:
+        return None
+    rows = []
+    for start in range(0, len(card_ids), HISTORY_CHUNK):
+        chunk = card_ids[start:start + HISTORY_CHUNK]
+        rows += db.session.execute(
+            select(Transaction.card_id, Transaction.timestamp, Transaction.amount)
+            .where(Transaction.card_id.in_(chunk))
+        ).all()
+    return pd.DataFrame(rows, columns=["card_id", "trans_date_trans_time", "amt"])
 
 
 def model_version(model):
