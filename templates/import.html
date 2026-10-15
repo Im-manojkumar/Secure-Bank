@@ -11,7 +11,7 @@
 <form class="card" id="import-form">
   <div class="drop" id="drop">
     <p><strong>Drop a CSV file here</strong> or choose one.</p>
-    <input id="file" name="file" type="file" accept=".csv,text/csv" style="max-width:320px">
+    <input id="file" name="file" type="file" accept=".csv,text/csv" class="input-file">
   </div>
   <p class="muted">Every row is scored by the model, and suspicious rows open a fraud case. Rows already imported are skipped.
      For files over 200 MB, use <code>flask --app app import-csv path/to/file.csv</code>.</p>
@@ -22,7 +22,7 @@
   </div>
 </form>
 
-<div class="card" style="margin-top:16px">
+<div class="card mt-16">
   <h2>Import history</h2>
   <div class="table-wrap">
     <table>

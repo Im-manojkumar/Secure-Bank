@@ -182,6 +182,15 @@ details.table-view .table-wrap { max-height: 260px; overflow-y: auto; }
 .score-meter .fill { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: var(--series-1); }
 .score-meter .threshold { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--text); }
 
+/* ---- Small utilities (no inline styles: the CSP forbids them) ---- */
+.mt-12 { margin-top: 12px; }
+.mt-16 { margin-top: 16px; }
+.w-full { width: 100%; }
+.input-narrow { max-width: 180px; }
+.input-file { max-width: 320px; }
+.badge-lg { font-size: 1rem; }
+.error-card { max-width: 520px; margin: 40px auto; text-align: center; }
+
 /* ---- Login ---- */
 .login-wrap { min-height: 80vh; display: grid; place-items: center; }
 .login-card { width: 100%; max-width: 380px; }

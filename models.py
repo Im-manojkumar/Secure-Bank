@@ -178,3 +178,31 @@ class FraudCase(db.Model):
                 "risk_score": round(t.prediction.risk_score, 6) if t.prediction else None,
             }
         return data
+
+
+class AuditLog(db.Model):
+    """Who did what and when, for sensitive actions. Rows are only ever added."""
+
+    __tablename__ = "audit_logs"
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    action = db.Column(db.String(50), nullable=False, index=True)
+    # What the action was about, e.g. the email tried at login or "case:12".
+    subject = db.Column(db.String(255), index=True)
+    details = db.Column(JSON)
+    ip_address = db.Column(db.String(45))
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False, index=True)
+
+    user = db.relationship("User")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "user": self.user.email if self.user else None,
+            "action": self.action,
+            "subject": self.subject,
+            "details": self.details,
+            "ip_address": self.ip_address,
+            "created_at": self.created_at.isoformat(),
+        }

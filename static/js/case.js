@@ -1,5 +1,6 @@
 (function () {
   const $ = (id) => document.getElementById(id);
+  const PAGE_ID = $("page-title").dataset.id;
   const form = $("review-form");
 
   // An outcome is only chosen when resolving a case.
@@ -42,7 +43,7 @@
     const button = form.querySelector("button[type=submit]");
     button.disabled = true;
     try {
-      const { case: updated } = await SB.api(`/api/cases/${window.CASE_ID}`, { method: "PATCH", json: payload });
+      const { case: updated } = await SB.api(`/api/cases/${PAGE_ID}`, { method: "PATCH", json: payload });
       render(updated);
       SB.message($("review-message"), "Review saved.", "success");
     } catch (error) {
@@ -52,7 +53,7 @@
     }
   });
 
-  SB.api(`/api/cases/${window.CASE_ID}`)
+  SB.api(`/api/cases/${PAGE_ID}`)
     .then(({ case: c }) => render(c))
     .catch((error) => {
       form.hidden = true;

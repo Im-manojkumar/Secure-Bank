@@ -7,6 +7,7 @@ from sqlalchemy import select
 from models import CASE_STATUSES, FraudCase, Prediction, Transaction, db
 from routes.auth import role_required
 from routes.pagination import paginate
+from services import audit
 from services.alerts import CaseUpdateError, apply_case_update
 
 bp = Blueprint("alerts", __name__, url_prefix="/api")
@@ -40,9 +41,15 @@ def get_case(case_id):
 @role_required("admin", "analyst")
 def update_case(case_id):
     case = db.get_or_404(FraudCase, case_id)
+    before = {"status": case.status, "outcome": case.outcome}
     try:
         apply_case_update(case, request.get_json(silent=True), current_user)
     except CaseUpdateError as exc:
         return jsonify(error=str(exc)), 400
+    audit.record("case_updated", user=current_user, subject=f"case:{case.id}", details={
+        "before": before,
+        "after": {"status": case.status, "outcome": case.outcome},
+        "notes_changed": "review_notes" in (request.get_json(silent=True) or {}),
+    })
     db.session.commit()
     return jsonify(case=case.to_dict())

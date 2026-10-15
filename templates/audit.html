@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Audit log</h1>
+    <p class="lede">Logins, imports and case changes, newest first. Entries cannot be edited or deleted from the app.</p>
+  </div>
+</div>
+
+<form class="card filters" id="audit-filters">
+  <div>
+    <label for="a-action">Action</label>
+    <select id="a-action" name="action">
+      <option value="">Any</option>
+      <option value="login_success">Login</option>
+      <option value="login_failed">Failed login</option>
+      <option value="login_blocked">Blocked login</option>
+      <option value="logout">Logout</option>
+      <option value="import_completed">Import completed</option>
+      <option value="import_failed">Import failed</option>
+      <option value="case_updated">Case updated</option>
+      <option value="user_created">User created</option>
+    </select>
+  </div>
+  <div><label for="a-subject">Subject contains</label><input id="a-subject" name="subject" placeholder="email, case:12, source:3"></div>
+  <div class="actions"><button class="btn btn-primary" type="submit">Filter</button><button class="btn" type="reset">Clear</button></div>
+</form>
+
+<p id="audit-error" role="alert" hidden></p>
+<div class="card">
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>When</th><th>Action</th><th>User</th><th>Subject</th><th>Details</th><th>IP address</th></tr></thead>
+      <tbody id="audit-body"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="pager" id="audit-pager"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/audit.js') }}"></script>
+{% endblock %}

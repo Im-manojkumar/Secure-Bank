@@ -15,8 +15,8 @@
     const fill = Math.min(r.risk_score / max, 1) * 100;
     $("result").replaceChildren(
       SB.el("p", {}, r.predicted_label === 1
-        ? SB.el("span", { class: "badge badge-critical", style: "font-size:1rem" }, "⚠ Suspicious")
-        : SB.el("span", { class: "badge badge-good", style: "font-size:1rem" }, "✓ Low risk")),
+        ? SB.el("span", { class: "badge badge-critical badge-lg" }, "⚠ Suspicious")
+        : SB.el("span", { class: "badge badge-good badge-lg" }, "✓ Low risk")),
       SB.el("div", { class: "score-meter", role: "img", "aria-label": `Risk score ${SB.score(r.risk_score)}, alert threshold ${SB.score(r.threshold)}` },
         SB.el("div", { class: "fill", style: `width:${fill}%` }),
         SB.el("div", { class: "threshold", style: `left:${(r.threshold / max) * 100}%`, title: "Alert threshold" })),
