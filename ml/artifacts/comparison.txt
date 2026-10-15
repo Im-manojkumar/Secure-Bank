@@ -1,0 +1,17 @@
+Validation set
+Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts
+-----------------------------------------------------------------------------------------
+Logistic Regression       0.8734   0.7340  0.7977   0.6900   0.9722      25            10
+Decision Tree             0.6087   0.7447  0.6699   0.4654   0.8859      24            45
+Random Forest             0.9067   0.7234  0.8047   0.7795   0.9660      26             7
+SVM (linear)              0.7634   0.7553  0.7594   0.6370   0.9716      23            22
+
+Test set
+Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts
+-----------------------------------------------------------------------------------------
+Logistic Regression       0.8875   0.7474  0.8114   0.7342   0.9680      24             9
+Decision Tree             0.6017   0.7474  0.6667   0.4757   0.9272      24            47
+Random Forest             0.8846   0.7263  0.7977   0.7875   0.9866      26             9
+SVM (linear)              0.7553   0.7474  0.7513   0.7069   0.9704      24            23
+
+Best model: Random Forest (threshold 0.815372)
