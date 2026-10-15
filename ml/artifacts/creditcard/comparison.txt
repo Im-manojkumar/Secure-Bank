@@ -1,21 +1,22 @@
 Dataset: Kaggle credit card
+Split: by time (train on earliest, test on latest)
 
 Validation set
 Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts
 -----------------------------------------------------------------------------------------
-Logistic Regression       0.8734   0.7340  0.7977   0.6900   0.9722      25            10
-Decision Tree             0.6087   0.7447  0.6699   0.4654   0.8859      24            45
-Random Forest             0.9067   0.7234  0.8047   0.7795   0.9660      26             7
-SVM (linear)              0.7634   0.7553  0.7594   0.6370   0.9716      23            22
-Gradient Boosting         0.9211   0.7447  0.8235   0.7940   0.9655      24             6
+Logistic Regression       0.9756   0.7018  0.8163   0.7736   0.9653      17             1
+Decision Tree             0.5909   0.6842  0.6341   0.4200   0.8379      18            27
+Random Forest             0.9556   0.7544  0.8431   0.7473   0.9556      14             2
+SVM (linear)              0.6032   0.6667  0.6333   0.5723   0.9664      19            25
+Gradient Boosting         0.9556   0.7544  0.8431   0.7918   0.9647      14             2
 
 Test set
 Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts
 -----------------------------------------------------------------------------------------
-Logistic Regression       0.8875   0.7474  0.8114   0.7342   0.9680      24             9
-Decision Tree             0.6017   0.7474  0.6667   0.4757   0.9272      24            47
-Random Forest             0.8846   0.7263  0.7977   0.7875   0.9866      26             9
-SVM (linear)              0.7553   0.7474  0.7513   0.7069   0.9704      24            23
-Gradient Boosting         0.9250   0.7789  0.8457   0.8579   0.9779      21             6
+Logistic Regression       0.9423   0.6622  0.7778   0.7513   0.9807      25             3
+Decision Tree             0.6543   0.7162  0.6839   0.4786   0.8321      21            28
+Random Forest             0.9153   0.7297  0.8120   0.8050   0.9640      20             5
+SVM (linear)              0.6857   0.6486  0.6667   0.6488   0.9798      26            22
+Gradient Boosting         0.8667   0.7027  0.7761   0.7849   0.9676      22             8
 
-Best model: Gradient Boosting (threshold 0.934821)
+Best model: Gradient Boosting (threshold 0.513582)
