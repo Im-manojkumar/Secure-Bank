@@ -28,6 +28,10 @@ class Config:
     REMEMBER_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "0") == "1"
 
+    # The live API declines outright at or above this risk score; between the model's
+    # alert threshold and this, it approves but opens a case for review.
+    DECLINE_SCORE = float(os.environ.get("DECLINE_SCORE", 0.98))
+
     PER_PAGE_DEFAULT = 25
     PER_PAGE_MAX = 100
     # Largest CSV download allowed, so one click cannot stream a million rows.

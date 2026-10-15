@@ -235,6 +235,24 @@ class SavedReport(db.Model):
         }
 
 
+class ApiKey(db.Model):
+    """A key another system (say, a payment switch) uses to call the live scoring API.
+
+    Only a SHA-256 hash of the key is stored; the key itself is shown once, when made.
+    """
+
+    __tablename__ = "api_keys"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    # The first characters of the key, so people can tell keys apart without the secret.
+    prefix = db.Column(db.String(12), nullable=False)
+    key_hash = db.Column(db.String(64), unique=True, nullable=False)
+    created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
+    last_used_at = db.Column(db.DateTime)
+    revoked_at = db.Column(db.DateTime)
+
+
 class AuditLog(db.Model):
     """Who did what and when, for sensitive actions. Rows are only ever added."""
 

@@ -8,7 +8,7 @@
     login_success: "Login", login_failed: "⚠ Failed login", login_blocked: "⛔ Blocked login", logout: "Logout",
     import_completed: "Import completed", import_failed: "⚠ Import failed", case_updated: "Case updated", user_created: "User created",
     report_saved: "Report saved", report_deleted: "Report deleted", report_exported: "CSV downloaded",
-    model_retrained: "Model retrained",
+    model_retrained: "Model retrained", api_key_created: "API key created", api_key_revoked: "API key revoked",
   };
 
   // Plain-language summary of the details object for each kind of entry.
@@ -27,6 +27,8 @@
     if (entry.action === "user_created") return `role ${d.role}`;
     if (entry.action === "report_saved" || entry.action === "report_deleted") return d.name;
     if (entry.action === "model_retrained") return `${d.model}, learned from ${SB.number(d.reviewed_cases)} reviewed cases, test PR-AUC ${d.test_pr_auc}`;
+    if (entry.action === "api_key_created") return `${d.name} (${d.prefix}…)`;
+    if (entry.action === "api_key_revoked") return d.name;
     if (entry.action === "report_exported") return `${SB.number(d.rows)} rows · ${SB.describeFilters(d.filters)}`;
     return "";
   }
