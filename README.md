@@ -188,6 +188,12 @@ There are two roles. An **admin** can do everything, including importing files. 
 
 ### What happens on import
 
+An upload is checked straight away: a file that is not CSV, matches no format, or has no trained model is refused at once. The file is then saved and queued, and the upload returns. A background worker imports it, saving 5,000 rows at a time, and the import page shows its progress ("Saved 20,000 new rows of 60,000…"). You can leave the page; the history table shows the result. Saving in chunks also means a long import never blocks other users: SQLite lets one write happen at a time, and logins, which write to the audit log, now answer in under a quarter of a second during a 200,000-row import. If an import stops part-way, the rows already saved stay, and importing the file again adds the rest, since saved rows are skipped as duplicates.
+
+Who runs the worker depends on `IMPORT_MODE`. The default, `thread`, runs it in a background thread of the web server, which suits `flask run`. In production, `IMPORT_MODE=worker` leaves imports to a separate `flask --app app import-worker` process, so restarting the web server never cuts an import short; `docker-compose.yml` runs one. An import that saves no progress for 30 minutes is marked failed.
+
+Then, for every file:
+
 1. The format is recognised from the file's columns. A file missing a required column of its closest format is rejected with the names of the missing columns, and the failed import is still recorded. The import page lists the columns each format needs.
 2. Rows with non-numeric values, a negative amount, an unknown category or date, or a fraud label other than 0 or 1 are skipped and counted.
 3. Duplicate rows are skipped, whether they repeat within the file or were imported before.
@@ -205,7 +211,7 @@ There are two roles. An **admin** can do everything, including importing files. 
 | Reports (`/reports`) | Searches the team has saved. Opening one runs it again and shows its totals per format, its fraud cases and their outcomes, with a CSV download |
 | Case (`/cases/<id>`) | The flagged transaction, why it was flagged, and a review form for status, outcome and investigation notes |
 | Check a transaction (`/predict`) | Pick a format, score any set of values and see what raised the score, or start from an imported transaction and change it |
-| Import (`/import`, admins only) | Upload a CSV with a progress bar, and see the history of past imports |
+| Import (`/import`, admins only) | Upload a CSV and follow the import's progress while it runs in the background, and see the history of past imports |
 | Audit log (`/audit`, admins only) | Every login, failed login, import, case change and new user, with filters |
 
 ![Dashboard](docs/screenshots/dashboard-light.png)
@@ -232,8 +238,9 @@ Every endpoint except login and the live scoring API needs a logged-in session c
 | `POST /api/auth/2fa/setup` | logged in | Start two-factor setup: returns a new secret and its `otpauth://` link |
 | `POST /api/auth/2fa/enable` | logged in | Finish setup with `{"code"}` from the app |
 | `POST /api/auth/2fa/disable` | logged in, not a required admin | Turn it off with `{"password", "code"}` |
-| `POST /api/transactions/import` | admin | Upload a CSV as form field `file`; the format is detected from its columns |
+| `POST /api/transactions/import` | admin | Upload a CSV as form field `file`; the format is detected from its columns. Returns 202 with the queued import |
 | `GET /api/sources` | logged in | Past imports and their results |
+| `GET /api/sources/<id>` | logged in | One import, with its status (`queued`, `processing`, `completed` or `failed`) and `rows_processed` so far |
 | `GET /api/transactions` | logged in | Search, with filters `dataset`, `source_id`, `date_from`, `date_to`, `min_amount`, `max_amount`, `prediction` (`suspicious` or `low_risk`) and `status` |
 | `GET /api/transactions/<id>` | logged in | One transaction with its model inputs and explanation |
 | `GET /api/models` | logged in | Each format, its input fields and its trained model's threshold and test results |
@@ -315,12 +322,12 @@ With `SECUREBANK_ENV=production`, which the Docker image sets:
 pytest
 ```
 
-There are 160 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, saved reports with their CSV downloads, and the production settings.
+There are 167 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, saved reports with their CSV downloads, the production settings, and background imports.
 
 ## Project layout
 
 ```
-app.py            Flask app factory and CLI commands (init-db, create-user, import-csv, retrain, create-api-key, revoke-api-key, backup-db)
+app.py            Flask app factory and CLI commands (init-db, create-user, import-csv, import-worker, retrain, create-api-key, revoke-api-key, backup-db)
 config.py         settings, overridable with environment variables
 models.py         database tables
 routes/           API endpoints (auth, transactions, alerts, reports, dashboard, audit) and HTML pages (pages.py)

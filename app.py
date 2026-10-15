@@ -358,14 +358,32 @@ def register_commands(app):
     @click.argument("path", type=click.Path(exists=True, dir_okay=False))
     def import_csv(path):
         """Import a transactions CSV from disk (for files too big to upload)."""
-        from services.ingestion import CSVImportError, import_transactions
+        from models import DataSource
+        from services.ingestion import CSVImportError, import_transactions, record_failed_import
         from services.prediction import ModelNotReady
 
+        name = Path(path).name
+        source = DataSource(name=name, source_type="csv_file", status="processing")
+        db.session.add(source)
+        db.session.commit()
+        source_id = source.id
         try:
             with open(path, "rb") as f:
-                source = import_transactions(f, Path(path).name, source_type="csv_file")
+                source = import_transactions(f, name, source=source)
         except (CSVImportError, ModelNotReady) as exc:
             db.session.rollback()
-            raise click.ClickException(str(exc))
+            source = record_failed_import(name, str(exc), source=db.session.get(DataSource, source_id))
+            raise click.ClickException(source.message)
         click.echo(source.message)
+
+    @app.cli.command("import-worker")
+    @click.option("--once", is_flag=True, help="Run the queued imports, then stop")
+    def import_worker(once):
+        """Import uploaded files as they are queued (for IMPORT_MODE=worker)."""
+        from services.jobs import work
+
+        click.echo("Waiting for imports. Press Ctrl+C to stop." if not once else "Running queued imports.")
+        ran = work(app, once=once)
+        if once:
+            click.echo(f"Ran {ran} imports.")
 

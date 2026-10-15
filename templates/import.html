@@ -15,6 +15,7 @@
     <input id="file" name="file" type="file" accept=".csv,text/csv" class="input-file">
   </div>
   <p class="muted">Every row is scored by the model, and suspicious rows open a fraud case. Rows already imported are skipped.
+     Imports run in the background, so you can leave this page; the history below shows the result.
      For files over 200 MB, use <code>flask --app app import-csv path/to/file.csv</code>.</p>
   <progress id="progress" max="100" value="0" hidden></progress>
   <p id="import-message" role="status" hidden></p>

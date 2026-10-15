@@ -1,17 +1,37 @@
 # SecureBank behind Caddy, which gets and renews an HTTPS certificate on its own.
 # Copy deploy/env.example to .env and fill it in first; see docs/DEPLOYMENT.md.
+
+# Shared by the web app and the import worker: same image, settings and files.
+x-securebank: &securebank
+  build: .
+  image: securebank
+  env_file: .env
+  volumes:
+    - securebank-data:/data
+    - ./ml/artifacts:/app/ml/artifacts
+    - ./data/raw:/app/data/raw:ro
+  restart: unless-stopped
+
 services:
   app:
-    build: .
-    env_file: .env
+    <<: *securebank
     environment:
       # Only Caddy can reach the app, so its X-Forwarded-For header can be trusted.
       TRUST_PROXY: "1"
-    volumes:
-      - securebank-data:/data
-      - ./ml/artifacts:/app/ml/artifacts
-      - ./data/raw:/app/data/raw:ro
-    restart: unless-stopped
+      # Uploads are queued for the worker below, so restarting the app never cuts an import short.
+      IMPORT_MODE: worker
+
+  worker:
+    <<: *securebank
+    command: flask import-worker
+    environment:
+      IMPORT_MODE: worker
+    # The image's health check calls the web server, which this container does not run.
+    healthcheck:
+      disable: true
+    depends_on:
+      app:
+        condition: service_healthy
 
   caddy:
     image: caddy:2.8.4

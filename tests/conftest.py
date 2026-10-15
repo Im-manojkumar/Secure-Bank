@@ -25,6 +25,7 @@ def model_dir(tmp_path_factory):
 def app(model_dir, tmp_path):
     class Config(TestConfig):
         MODEL_DIR = model_dir
+        UPLOAD_DIR = tmp_path / "uploads"
 
     app = create_app(Config)
     # Tests must not hold an app context open while making requests: Flask would

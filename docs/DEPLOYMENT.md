@@ -2,16 +2,19 @@
 
 This guide runs SecureBank on a Linux server with Docker, behind HTTPS. `flask run` is only for development: it serves plain HTTP, handles one request at a time, and shows no access log.
 
-The setup has two containers:
+The setup has three containers:
 
 ```
 Browser / payment system ──HTTPS──> Caddy (ports 80, 443) ──HTTP──> gunicorn + Flask app (port 8000, not published)
-                                                                       │
-                                                         /data volume: securebank.db, backups/
+                                                                       │ queues uploads
+                                                         /data volume: securebank.db, uploads/, backups/
+                                                                       │ claims and imports them
+                                                                 import worker (flask import-worker)
 ```
 
 - **Caddy** gets a certificate from Let's Encrypt for your domain, renews it, redirects HTTP to HTTPS, and passes requests to the app with the visitor's address in `X-Forwarded-For`.
 - **gunicorn** runs the Flask app with two worker processes and logs every request to the container's output.
+- The **import worker** imports uploaded CSV files in the background. The web app only checks and queues them, so restarting it never cuts an import short.
 - The **database** and its **backups** live in a Docker volume, so they survive rebuilding the image.
 - The trained **models** are mounted from `ml/artifacts/` on the server, so a retrained model survives too.
 
@@ -64,9 +67,9 @@ The app creates or updates its tables on every start. Open `https://<SITE_ADDRES
 Check that it is running:
 
 ```bash
-docker compose ps                      # app should show "healthy"
+docker compose ps                      # app should show "healthy", and worker "running"
 curl https://<SITE_ADDRESS>/api/health # {"database":"ok","status":"ok"}
-docker compose logs -f app             # requests and errors
+docker compose logs -f app worker      # requests, imports and errors
 ```
 
 `/api/health` returns 503 when the database cannot be reached, so an uptime monitor or load balancer can use it.
@@ -108,11 +111,11 @@ git pull
 docker compose up -d --build           # rebuilds the image; the database volume is kept
 ```
 
-To retrain a model with the analysts' case decisions (see the README), run it inside the container and restart so every worker loads the new model:
+To retrain a model with the analysts' case decisions (see the README), run it inside the container and restart the app and the import worker so they load the new model:
 
 ```bash
 docker compose exec app flask retrain --dataset sparkov --data data/raw/fraudTrain.csv --test-data data/raw/fraudTest.csv
-docker compose restart app
+docker compose restart app worker
 ```
 
 The container runs as user ID 1000, which must be able to write `ml/artifacts/` on the server for this (`sudo chown -R 1000 ml/artifacts`).
@@ -122,15 +125,17 @@ The container runs as user ID 1000, which must be able to write `ml/artifacts/` 
 The same settings work on a plain server:
 
 ```bash
-export SECUREBANK_ENV=production SECRET_KEY=... CARD_ID_KEY=... TRUST_PROXY=1
+export SECUREBANK_ENV=production SECRET_KEY=... CARD_ID_KEY=... TRUST_PROXY=1 IMPORT_MODE=worker
 flask --app app init-db
 gunicorn --bind 127.0.0.1:8000 --workers 2 --timeout 300 'app:create_app()'
+flask --app app import-worker          # in a second service, such as a systemd unit
 ```
 
-Put nginx or Caddy in front for HTTPS, and schedule `flask --app app backup-db` with cron.
+Put nginx or Caddy in front for HTTPS, and schedule `flask --app app backup-db` with cron. Without `IMPORT_MODE=worker`, each gunicorn process runs imports in a background thread instead, which works but can cut an import short when gunicorn restarts a process.
 
 ## Known limits
 
 - SQLite allows one writer at a time, which suits one server and a small team. More traffic or several servers need PostgreSQL (change `DATABASE_URL`, and the one SQLite-specific `strftime` call in `routes/dashboard.py`).
-- Imports from the web page run inside the request, hence gunicorn's 300-second timeout. Very large files are better imported with `flask import-csv`.
+- Uploads are limited to 200 MB. Larger files go through `flask import-csv`.
+- There is one import worker, so imports run one after another. That keeps SQLite's single writer free for everyone else.
 - Logs go to the container output only. A real deployment would ship them to a log service and alert on errors.
