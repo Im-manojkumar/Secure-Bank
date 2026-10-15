@@ -10,6 +10,7 @@ from pathlib import Path
 import joblib
 
 from ml.datasets import DEFAULT_PROFILE, get_profile
+from ml import drift
 from ml.explain import explain, fraud_scores
 from ml.train import ARTIFACTS_DIR
 
@@ -42,3 +43,10 @@ class FraudModel:
     def explain(self, df, history=None, top=3):
         """For each row, the inputs that raised its score most (see ml/explain.py)."""
         return explain(self.pipeline, self.profile, self._inputs(df, history), self.meta["baseline"], top)
+
+    def check_drift(self, df, scores, history=None):
+        """How far these rows have drifted from the training data (see ml/drift.py), or None."""
+        reference = self.meta.get("drift_reference")
+        if reference is None:
+            return None
+        return drift.check(reference, self._inputs(df, history), scores)

@@ -192,7 +192,8 @@ There are two roles. An **admin** can do everything, including importing files. 
 2. Rows with non-numeric values, a negative amount, an unknown category or date, or a fraud label other than 0 or 1 are skipped and counted.
 3. Duplicate rows are skipped, whether they repeat within the file or were imported before.
 4. Every row is scored by that format's model. Each transaction, its prediction and, when it is flagged, an **Open** fraud case are stored in separate tables, so an analyst's finding never overwrites what the model said. Flagged rows also store the three inputs that raised their score.
-5. Credit card `Time` is turned into a date by counting seconds from 1 September 2013, when that dataset begins. PaySim's `step` counts hours from 1 January 2016, a made-up start because the simulator has no real dates. Sparkov has real dates.
+5. The file is checked for **drift**: whether its transactions still look like the ones the model learned from. Each input group and the model's scores are compared with their spread on the validation set, using the population stability index (PSI). Below 0.1 is stable, 0.1 to 0.25 is a moderate shift, and above 0.25 is a major shift that makes the scores unreliable. A shift is written into the import message and shown on the dashboard until a newer import of that format is stable. Files under 200 rows are not judged. Inputs that grow with time by design, such as credit card `Time`, are left out.
+6. Credit card `Time` is turned into a date by counting seconds from 1 September 2013, when that dataset begins. PaySim's `step` counts hours from 1 January 2016, a made-up start because the simulator has no real dates. Sparkov has real dates.
 
 ### Pages
 
@@ -283,7 +284,7 @@ Before running anywhere other than your own machine:
 pytest
 ```
 
-There are 131 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
+There are 134 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
 
 ## Project layout
 

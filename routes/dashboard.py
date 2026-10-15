@@ -5,6 +5,7 @@ from flask_login import login_required
 from sqlalchemy import func, select
 
 from ml.datasets import PROFILES
+from ml.drift import describe as drift_message
 from models import CASE_STATUSES, DataSource, FraudCase, Prediction, Transaction, currency_of, db
 
 bp = Blueprint("dashboard", __name__, url_prefix="/api/dashboard")
@@ -66,7 +67,20 @@ def summary():
         .join(Prediction, Prediction.transaction_id == Transaction.id)
     ).group_by(bucket).order_by(bucket)).all()
 
+    # The latest import of each format, when it drifted away from the model's training data.
+    latest = select(DataSource.dataset, func.max(DataSource.id).label("id")).where(
+        DataSource.status == "completed").group_by(DataSource.dataset)
+    if dataset:
+        latest = latest.where(DataSource.dataset == dataset)
+    latest_ids = [row.id for row in db.session.execute(latest)]
+    drift_warnings = [
+        {"dataset": s.dataset, "source": s.name, "level": s.drift["level"], "message": drift_message(s.drift)}
+        for s in db.session.scalars(select(DataSource).where(DataSource.id.in_(latest_ids)))
+        if s.drift and s.drift["level"] != "stable"
+    ]
+
     return jsonify(
+        drift_warnings=drift_warnings,
         total_transactions=total,
         predicted_fraud=flagged,
         predicted_fraud_rate=round(flagged / total, 6) if total else 0,

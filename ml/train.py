@@ -50,6 +50,7 @@ from ml.evaluate import (
     plot_confusion_matrix,
     plot_pr_curves,
 )
+from ml.drift import build_reference, check as check_drift
 from ml.explain import baseline_values, fraud_scores
 from ml.preprocess import DEFAULT_DATA_PATH, load_data, split_data, split_with_test_file
 
@@ -225,6 +226,13 @@ def train(data_path=DEFAULT_DATA_PATH, use_smote=True, out_dir=None, dataset=DEF
     print(f"\nBest model: {best_name} (threshold {best['threshold']})")
     print(threshold_comparison(best_name, threshold_rule, best, other_rule, other))
 
+    reference = build_reference(profile, X_val, val_scores[best_name])
+    # The test period is the closest thing to "new data": how far did it drift?
+    test_drift = check_drift(reference, X_test, test_scores[best_name])
+    if test_drift:
+        print(f"Test period drift from validation: {test_drift['level']} (score PSI {test_drift['score_psi']}; "
+              + ", ".join(f"{i['input']} {i['psi']}" for i in test_drift["most_shifted"]) + ")")
+
     joblib.dump(fitted[best_name], out_dir / "model.joblib")
     metadata = {
         "dataset": dataset,
@@ -247,12 +255,14 @@ def train(data_path=DEFAULT_DATA_PATH, use_smote=True, out_dir=None, dataset=DEF
                         | {"total_cost": best["cost"]["total_cost"]},
         # A typical genuine transaction, the comparison point for explanations.
         "baseline": baseline_values(profile, X_train[y_train == 0]),
+        # How inputs and scores were spread on the validation set, to spot drift in new imports.
+        "drift_reference": reference,
     }
     (out_dir / "model_meta.json").write_text(json.dumps(metadata, indent=2))
     (out_dir / "metrics.json").write_text(
         json.dumps({"split": metadata["split"], "threshold_rule": threshold_rule, "review_cost": review_cost,
                     "validation": val_results, "test": test_results, "best_model": best_name,
-                    "other_threshold_rule": {"rule": other_rule, "test": other}}, indent=2)
+                    "test_drift": test_drift, "other_threshold_rule": {"rule": other_rule, "test": other}}, indent=2)
     )
     report = (
         f"Dataset: {profile.title}\n"

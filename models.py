@@ -69,6 +69,8 @@ class DataSource(db.Model):
     rows_imported = db.Column(db.Integer, default=0)
     rows_skipped = db.Column(db.Integer, default=0)
     message = db.Column(db.Text)
+    # How far the file's transactions drifted from the model's training data (ml/drift.py).
+    drift = db.Column(JSON)
     imported_by = db.Column(db.Integer, db.ForeignKey("users.id"))
     created_at = db.Column(db.DateTime, default=utcnow, nullable=False)
 
@@ -83,6 +85,7 @@ class DataSource(db.Model):
             "rows_imported": self.rows_imported,
             "rows_skipped": self.rows_skipped,
             "message": self.message,
+            "drift": self.drift,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
 

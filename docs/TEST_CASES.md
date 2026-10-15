@@ -118,6 +118,14 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | FB-03 | `flask retrain` | Old model copied to `previous/`, new model records its reviewed cases, retrain audited | `test_retrain_command_keeps_the_old_model_and_logs_it` |
 | FB-04 | `flask retrain` with an unknown format | Refused with a clear message | `test_retrain_rejects_an_unknown_format` |
 
+## 7b. Drift check (`tests/test_drift.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| DR-01 | New rows spread like the training data, then amounts 20 times larger | Stable with no message; then a major shift led by Amount, with a warning | `test_psi_is_near_zero_for_the_same_spread_and_large_for_a_shift` |
+| DR-02 | Fewer than 200 rows | Not judged | `test_drift_is_not_judged_on_a_handful_of_rows` |
+| DR-03 | Import a normal file, then a shifted one | First stable; second marked major in its message and on the dashboard, only for its own format | `test_drift_shows_on_the_import_and_the_dashboard` |
+
 ## 8. Saved reports and CSV downloads (`tests/test_reports.py`)
 
 | ID | Case | Expected result | Test |
