@@ -55,7 +55,7 @@ python -m ml.train --dataset paysim --data data/raw/paysim.csv --max-train-rows 
 Sparkov and PaySim take about 5 to 10 minutes each and need a few GB of memory, mostly to load the files. Each run does the following:
 
 1. Loads the CSV, checks the columns, skips invalid rows and drops duplicates.
-2. Splits the data into train, validation and test sets with the same fraud rate in each. Credit card and PaySim are split 60/20/20. Sparkov comes with a later test file, so `fraudTrain.csv` is split 75/25 into train and validation and `fraudTest.csv` is the test set.
+2. Splits the data by time into train, validation and test sets, the way a deployed model meets new data: it learns from the past and is judged on what comes next. Credit card and PaySim are split 60/20/20, so the test set is the latest 20% of transactions. Sparkov comes with a later test file, so the earliest 75% of `fraudTrain.csv` is for training, the latest 25% for validation, and `fraudTest.csv` is the test set. Pass `--random-split` to shuffle rows instead; that mixes the same days into every set and overstates accuracy, so use it only for comparison.
 3. With `--max-train-rows`, keeps every fraud row in the training set but only a sample of the genuine ones. PaySim uses this to train on 1 million of its 3.8 million training rows. The validation and test sets keep their real mix.
 4. Trains five pipelines, each of which scales the inputs, balances the classes with SMOTE (training data only) and fits a classifier:
    - Logistic Regression (baseline)
@@ -85,41 +85,45 @@ Fraud is under 1% of every dataset, so a model that calls everything legitimate 
 
 These are test-set results from `ml/artifacts/<format>/comparison.txt`. The saved model for each format is in bold.
 
-### Credit card (56,746 test transactions, 95 fraud)
+The models are tested on the latest transactions, after the ones they learned from.
+
+### Credit card (56,746 test transactions, 74 fraud)
 
 | Model | Precision | Recall | F1 | PR-AUC | ROC-AUC | Missed fraud | False alerts |
 |---|---|---|---|---|---|---|---|
-| Logistic Regression | 0.887 | 0.747 | 0.811 | 0.734 | 0.968 | 24 | 9 |
-| Decision Tree | 0.602 | 0.747 | 0.667 | 0.476 | 0.927 | 24 | 47 |
-| Random Forest | 0.885 | 0.726 | 0.798 | 0.787 | 0.987 | 26 | 9 |
-| SVM (linear) | 0.755 | 0.747 | 0.751 | 0.707 | 0.970 | 24 | 23 |
-| **Gradient Boosting** | 0.925 | 0.779 | 0.846 | **0.858** | 0.978 | 21 | 6 |
+| Logistic Regression | 0.942 | 0.662 | 0.778 | 0.751 | 0.981 | 25 | 3 |
+| Decision Tree | 0.654 | 0.716 | 0.684 | 0.479 | 0.832 | 21 | 28 |
+| Random Forest | 0.915 | 0.730 | 0.812 | 0.805 | 0.964 | 20 | 5 |
+| SVM (linear) | 0.686 | 0.649 | 0.667 | 0.649 | 0.980 | 26 | 22 |
+| **Gradient Boosting** | 0.867 | 0.703 | 0.776 | **0.785** | 0.968 | 22 | 8 |
 
-Gradient Boosting replaces Random Forest, the model from step 1. It catches 74 of the 95 frauds instead of 69, with 6 false alerts instead of 9.
+Gradient Boosting had the best validation score, so it is the saved model, even though Random Forest did slightly better on the test set. Picking by the test set would make the test result meaningless.
+
+With the earlier random split, the same model scored PR-AUC 0.858 and caught 74 of 95 test frauds. That split mixed both days of the dataset into training and testing, so the model was partly tested on the same day it learned from. The time split is the honest figure.
 
 ### Sparkov (555,719 test transactions, 2,145 fraud)
 
 | Model | Precision | Recall | F1 | PR-AUC | ROC-AUC | Missed fraud | False alerts |
 |---|---|---|---|---|---|---|---|
-| Logistic Regression | 0.278 | 0.566 | 0.373 | 0.181 | 0.964 | 930 | 3,161 |
-| Decision Tree | 0.387 | 0.676 | 0.492 | 0.344 | 0.983 | 695 | 2,300 |
-| Random Forest | 0.843 | 0.700 | 0.765 | 0.813 | 0.995 | 644 | 280 |
-| SVM (linear) | 0.351 | 0.631 | 0.451 | 0.209 | 0.947 | 792 | 2,504 |
-| **Gradient Boosting** | 0.849 | 0.767 | 0.806 | **0.869** | 0.998 | 500 | 293 |
+| Logistic Regression | 0.275 | 0.588 | 0.375 | 0.181 | 0.963 | 883 | 3,329 |
+| Decision Tree | 0.388 | 0.679 | 0.494 | 0.350 | 0.987 | 688 | 2,298 |
+| Random Forest | 0.767 | 0.749 | 0.757 | 0.805 | 0.994 | 539 | 489 |
+| SVM (linear) | 0.348 | 0.627 | 0.448 | 0.206 | 0.945 | 801 | 2,517 |
+| **Gradient Boosting** | 0.855 | 0.772 | 0.811 | **0.869** | 0.998 | 490 | 280 |
 
-The test file covers the six months after the training file, so this is the most realistic of the three results: the model is tested on later transactions than it learned from. Linear models do badly here because fraud depends on combinations, such as a large online purchase late at night, that a single straight line cannot separate.
+The test file always covered the six months after the training file, so this result barely changed. Choosing the threshold on the latest part of the training file now catches 10 more frauds with 13 fewer false alerts. Linear models do badly here because fraud depends on combinations, such as a large online purchase late at night, that a single straight line cannot separate.
 
-### PaySim (1,272,416 test transactions, 1,640 fraud)
+### PaySim (1,293,438 test transactions, 4,244 fraud)
 
 | Model | Precision | Recall | F1 | PR-AUC | ROC-AUC | Missed fraud | False alerts |
 |---|---|---|---|---|---|---|---|
-| Logistic Regression | 0.738 | 0.497 | 0.594 | 0.634 | 0.997 | 825 | 290 |
-| Decision Tree | 0.990 | 0.998 | 0.994 | 0.988 | 0.999 | 4 | 16 |
-| **Random Forest** | 1.000 | 0.998 | 0.999 | **0.999** | 1.000 | 4 | 0 |
-| SVM (linear) | 0.661 | 0.490 | 0.562 | 0.597 | 0.997 | 837 | 412 |
-| Gradient Boosting | 1.000 | 0.998 | 0.999 | 0.998 | 1.000 | 4 | 0 |
+| Logistic Regression | 0.939 | 0.496 | 0.649 | 0.801 | 0.995 | 2,139 | 137 |
+| Decision Tree | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0 | 1 |
+| **Random Forest** | 1.000 | 0.993 | 0.997 | **1.000** | 1.000 | 30 | 0 |
+| SVM (linear) | 0.944 | 0.461 | 0.619 | 0.772 | 0.995 | 2,288 | 117 |
+| Gradient Boosting | 1.000 | 0.996 | 0.998 | 1.000 | 1.000 | 19 | 0 |
 
-The near-perfect score is a quirk of the simulator, not proof of a perfect model. In PaySim, fraudulent transfers almost always empty the account and leave balances that do not add up, which real bank data would not give away so easily.
+The near-perfect score is a quirk of the simulator, not proof of a perfect model. In PaySim, fraudulent transfers almost always empty the account and leave balances that do not add up, which real bank data would not give away so easily. The score stays near-perfect under the time split, which confirms that the simulator, not mixed-up days, is the reason. The last week of the simulation holds far more fraud than the rest (4,244 of 1.29 million test rows, against 3,173 of 3.79 million training rows).
 
 ![Precision-recall curves for credit card](ml/artifacts/creditcard/pr_curves.png)
 

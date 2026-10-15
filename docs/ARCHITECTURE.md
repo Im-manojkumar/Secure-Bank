@@ -137,17 +137,18 @@ Each dataset format has its own model, because the formats share no columns. `ml
 
 | Format | Data | Split | Model inputs | Saved model | Test PR-AUC | Precision | Recall |
 |---|---|---|---|---|---|---|---|
-| `creditcard` | 284,807 card payments, 492 frauds; 1,081 duplicates dropped | 60/20/20, stratified | `Time`, `V1` to `V28`, `Amount` | Gradient Boosting, threshold 0.935 | 0.858 | 0.925 | 0.779 |
-| `sparkov` | 1,852,394 simulated US card payments, 9,651 frauds | `fraudTrain.csv` 75/25 into train and validation; `fraudTest.csv`, six months later, is the test set | amount, hour, night-time, day of week, age, city population, customer-to-merchant distance, merchant category | Gradient Boosting, threshold 0.922 | 0.869 | 0.849 | 0.767 |
-| `paysim` | 6,362,620 simulated mobile-money transfers, 8,213 frauds; 543 duplicates dropped | 60/20/20, stratified; training cut to 1 million rows, keeping every fraud | type, amount, the four balances, account emptied, balance mismatches, hour | Random Forest, threshold 0.756 | 0.999 | 1.000 | 0.998 |
+| `creditcard` | 284,807 card payments, 492 frauds; 1,081 duplicates dropped | 60/20/20 by time | `Time`, `V1` to `V28`, `Amount` | Gradient Boosting, threshold 0.514 | 0.785 | 0.867 | 0.703 |
+| `sparkov` | 1,852,394 simulated US card payments, 9,651 frauds | `fraudTrain.csv` 75/25 by time into train and validation; `fraudTest.csv`, six months later, is the test set | amount, hour, night-time, day of week, age, city population, customer-to-merchant distance, merchant category | Gradient Boosting, threshold 0.926 | 0.869 | 0.855 | 0.772 |
+| `paysim` | 6,362,620 simulated mobile-money transfers, 8,213 frauds; 543 duplicates dropped | 60/20/20 by time; training cut to 1 million rows, keeping every fraud | type, amount, the four balances, account emptied, balance mismatches, hour | Random Forest, threshold 0.930 | 1.000 | 1.000 | 0.993 |
 
 - **Pipeline:** `StandardScaler`, then `SMOTE`, then the classifier. SMOTE runs only while fitting, so validation and test rows are never resampled.
 - **Candidates:** Logistic Regression, Decision Tree, Random Forest, a linear SVM and Gradient Boosting (`HistGradientBoostingClassifier`).
+- **Split by time:** each model trains on the earliest transactions, picks its model and threshold on the next period, and is tested on the latest, as it would be once deployed. Rows with the same time stay in one set. The earlier random split mixed days across the sets and overstated accuracy: the credit card model's test PR-AUC drops from 0.858 to 0.785 under the time split. `--random-split` keeps the old split for comparison.
 - **Selection:** the highest PR-AUC on the validation set picks the model. Its alert threshold is the one that gives the best F1 on the validation set. The test set is scored once, at the end.
 - **Gradient Boosting needs regularisation.** Without an L2 penalty on its leaves, it fell apart on PaySim (validation PR-AUC 0.02), because leaves holding only SMOTE-made fraud rows got extreme values. With `l2_regularization=1.0` it reached 0.997.
 - **Fairness:** Sparkov includes each customer's gender. It is neither stored nor used, so the model cannot score men and women differently. An earlier version used it, and it showed up as a reason for some alerts. Names, street, job, ZIP code and the full card number are also never stored.
 - **PaySim's caveat:** its near-perfect score comes from the simulator. Its fraudulent transfers almost always empty the account and leave balances that do not add up, which makes them easy to spot. Real data would not be this clean, so the Sparkov result is the better guide to real-world performance.
-- **Step 1's model:** Random Forest on the credit card data, with test PR-AUC 0.787. Gradient Boosting now catches 74 of the 95 test frauds instead of 69, with 6 false alerts instead of 9.
+- **Step 1's model:** Random Forest on the credit card data, with test PR-AUC 0.787 under the old random split.
 
 ### Why a transaction was flagged
 
