@@ -6,7 +6,7 @@ This repository is built in stages:
 
 1. **Fraud model** (done): train and compare four classifiers on the Kaggle credit-card dataset.
 2. **Flask backend and SQLite database** (done): CSV import, prediction API, login and roles.
-3. Dashboard and case review: fraud statistics, transaction search, alerts and investigation notes.
+3. **Dashboard and case review** (done): fraud statistics, transaction search, alerts and investigation notes.
 4. Testing, security and documentation.
 
 ## Setup
@@ -90,9 +90,7 @@ scores, suspicious = model.score(pd.read_csv("new_transactions.csv"))
 
 A score is a ranking of how suspicious a transaction is, not a calibrated probability of fraud.
 
-## Running the backend
-
-The backend is a JSON API. The dashboard pages come in step 3.
+## Running the app
 
 ```bash
 export SECRET_KEY=change-me                       # Windows: set SECRET_KEY=change-me
@@ -102,6 +100,8 @@ flask --app app create-user admin@securebank.local --role admin
 flask --app app import-csv data/raw/creditcard.csv
 flask --app app run
 ```
+
+Then open http://127.0.0.1:5000 and log in.
 
 Importing the full Kaggle file takes about a minute. The resulting database in `instance/securebank.db` is about 350 MB and is not committed. Importing the same rows again skips them as duplicates.
 
@@ -114,6 +114,25 @@ There are two roles. An **admin** can do everything, including importing files. 
 3. Duplicate rows are skipped, whether they repeat within the file or were imported before.
 4. Every row is scored by the saved model. Each transaction, its prediction and, when it is flagged, an **Open** fraud case are stored in separate tables, so an analyst's finding never overwrites what the model said.
 5. `Time` is turned into a date by counting seconds from 1 September 2013, which is when the dataset begins.
+
+### Pages
+
+| Page | What it shows |
+|---|---|
+| Dashboard (`/`) | Totals, the fraud rate, cases waiting for review, transactions and suspicious transactions per hour, cases by status, and the highest-risk open alerts |
+| Transactions (`/transactions`) | Search by date, amount, prediction, case status and import, with each result linking to a detail page with all 30 model inputs |
+| Alerts (`/alerts`) | Fraud cases, highest risk first, with tabs for Open, Under review, Resolved and All |
+| Case (`/cases/<id>`) | The flagged transaction and a review form for status, outcome and investigation notes |
+| Check a transaction (`/predict`) | Score any set of values, or start from an imported transaction and change it |
+| Import (`/import`, admins only) | Upload a CSV with a progress bar, and see the history of past imports |
+
+![Dashboard](docs/screenshots/dashboard-light.png)
+
+| Alerts | Case review | Check a transaction |
+|---|---|---|
+| ![Alerts](docs/screenshots/alerts.png) | ![Case review](docs/screenshots/case.png) | ![Check a transaction](docs/screenshots/predict.png) |
+
+The pages are plain HTML, CSS and JavaScript with no build step and no external libraries. Each page fetches its data from the JSON API below, and the charts are drawn as SVG. Light and dark mode follow the system setting, and the layout works on phone screens.
 
 ### API
 
@@ -132,7 +151,7 @@ Every endpoint except login needs a logged-in session cookie. Errors come back a
 | `GET /api/alerts` | logged in | Fraud cases with the highest risk first, optionally filtered with `?status=Open` |
 | `GET /api/cases/<id>` | logged in | One fraud case |
 | `PATCH /api/cases/<id>` | admin, analyst | Update `status` (`Open`, `Under Review` or `Resolved`), `review_notes` and `outcome` (`Confirmed fraud` or `Legitimate`, required to resolve a case) |
-| `GET /api/dashboard/summary` | logged in | Totals, predicted fraud, cases by status and a daily trend |
+| `GET /api/dashboard/summary` | logged in | Totals, predicted fraud, cases by status and a trend by day, or by hour with `?granularity=hour` |
 
 List endpoints take `page` and `per_page` (at most 100).
 
@@ -152,7 +171,7 @@ curl -b cookies.txt -X PATCH -H "Content-Type: application/json" \
 pytest
 ```
 
-The tests use generated data and an in-memory database, so they run without the real dataset. They cover the model pipeline and every API endpoint, including login, roles, import validation, duplicate detection, filters and the case workflow.
+The tests use generated data and an in-memory database, so they run without the real dataset. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) and every page (login redirects, the admin-only import page and safe redirects after login).
 
 ## Project layout
 
@@ -160,7 +179,9 @@ The tests use generated data and an in-memory database, so they run without the 
 app.py            Flask app factory and CLI commands (init-db, create-user, import-csv)
 config.py         settings, overridable with environment variables
 models.py         database tables
-routes/           API endpoints: auth, transactions, alerts, dashboard
+routes/           API endpoints (auth, transactions, alerts, dashboard) and HTML pages (pages.py)
+templates/        Jinja page templates
+static/           CSS and JavaScript for the pages
 services/         import, prediction and case logic used by the routes
 ml/
   preprocess.py   load, validate and split the dataset

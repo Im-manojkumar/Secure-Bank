@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p class="lede">All imported transactions and what the model flagged.</p>
+  </div>
+  <a class="btn" href="{{ url_for('pages.alerts') }}">Review alerts</a>
+</div>
+<p id="dashboard-error" role="alert" hidden></p>
+
+<section class="grid tiles" aria-label="Key numbers">
+  <div class="card"><p class="tile-label">Transactions</p><p class="tile-value" id="t-total">–</p><p class="tile-sub">imported and scored</p></div>
+  <div class="card"><p class="tile-label">Flagged as suspicious</p><p class="tile-value" id="t-flagged">–</p><p class="tile-sub" id="t-rate">&nbsp;</p></div>
+  <div class="card"><p class="tile-label">Waiting for review</p><p class="tile-value" id="t-pending">–</p><p class="tile-sub">open or under review</p></div>
+  <div class="card"><p class="tile-label">Amount flagged</p><p class="tile-value" id="t-amount">–</p><p class="tile-sub">total of suspicious transactions</p></div>
+</section>
+
+<section class="grid two-col">
+  <div class="card">
+    <h2>Transactions per hour</h2>
+    <div class="chart" id="chart-volume"></div>
+  </div>
+  <div class="card">
+    <h2>Suspicious transactions per hour</h2>
+    <div class="chart" id="chart-suspicious"></div>
+  </div>
+</section>
+
+<section class="grid two-col">
+  <div class="card">
+    <h2>Fraud cases by status</h2>
+    <div class="status-bars" id="status-bars"></div>
+    <dl class="dl" style="margin-top:16px" id="outcomes"></dl>
+  </div>
+  <div class="card">
+    <h2>Highest-risk open alerts</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Case</th><th>Time</th><th class="num">Amount</th><th class="num">Risk score</th></tr></thead>
+        <tbody id="top-alerts"></tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/chart.js') }}"></script>
+<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

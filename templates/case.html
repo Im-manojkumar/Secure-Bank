@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Case {{ case_id }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('pages.alerts') }}">← All alerts</a></p>
+<div class="page-head">
+  <div>
+    <h1>Case #{{ case_id }} <span id="case-status"></span></h1>
+    <p class="lede" id="case-sub">&nbsp;</p>
+  </div>
+</div>
+<p id="case-error" role="alert" hidden></p>
+
+<section class="grid two-col">
+  <div class="card">
+    <h2>Flagged transaction</h2>
+    <dl class="dl" id="case-transaction"></dl>
+    <p style="margin-top:12px"><a id="case-tx-link" href="#">See all transaction details →</a></p>
+  </div>
+
+  <form class="card" id="review-form">
+    <h2>Review</h2>
+    <div class="field">
+      <label for="status">Status</label>
+      <select id="status" name="status">
+        <option>Open</option>
+        <option>Under Review</option>
+        <option>Resolved</option>
+      </select>
+    </div>
+    <div class="field" id="outcome-field">
+      <label for="outcome">Outcome</label>
+      <select id="outcome" name="outcome">
+        <option value="">Choose an outcome</option>
+        <option>Confirmed fraud</option>
+        <option>Legitimate</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="notes">Investigation notes</label>
+      <textarea id="notes" name="review_notes" maxlength="5000" placeholder="What did you check, and what did you find?"></textarea>
+    </div>
+    <p id="review-message" role="status" hidden></p>
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Save review</button>
+      <span class="muted" id="review-meta"></span>
+    </div>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>window.CASE_ID = {{ case_id|tojson }};</script>
+<script src="{{ url_for('static', filename='js/case.js') }}"></script>
+{% endblock %}

@@ -207,14 +207,18 @@ def test_dashboard_summary(admin, imported):
     assert body["total_transactions"] == 1000
     assert body["predicted_fraud"] == body["cases_by_status"]["Open"]
     assert body["pending_review"] == body["predicted_fraud"]
-    assert sum(d["transactions"] for d in body["daily_trend"]) == 1000
+    assert sum(d["transactions"] for d in body["trend"]) == 1000
+    hourly = admin.get("/api/dashboard/summary?granularity=hour").get_json()["trend"]
+    assert len(hourly) > len(body["trend"])
+    assert hourly[0]["period"].endswith(":00")
+    assert sum(d["suspicious"] for d in hourly) == body["predicted_fraud"]
 
 
 def test_dashboard_summary_empty_database(admin):
     body = admin.get("/api/dashboard/summary").get_json()
     assert body["total_transactions"] == 0
     assert body["predicted_fraud_rate"] == 0
-    assert body["daily_trend"] == []
+    assert body["trend"] == []
 
 
 def test_api_errors_are_json(admin):
