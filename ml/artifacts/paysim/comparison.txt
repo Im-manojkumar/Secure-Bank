@@ -2,21 +2,25 @@ Dataset: PaySim mobile money
 Split: by time (train on earliest, test on latest)
 
 Validation set
-Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts
------------------------------------------------------------------------------------------
-Logistic Regression       0.7419   0.4679  0.5739   0.6085   0.9986     415           127
-Decision Tree             0.9962   1.0000  0.9981   0.9962   1.0000       0             3
-Random Forest             0.9987   1.0000  0.9994   1.0000   1.0000       0             1
-SVM (linear)              0.7451   0.4385  0.5521   0.5724   0.9982     438           117
-Gradient Boosting         1.0000   1.0000  1.0000   1.0000   1.0000       0             0
+Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts    Total cost
+-------------------------------------------------------------------------------------------------------
+Logistic Regression       0.0274   0.9987  0.0534   0.6085   0.9986       1         27631       324,489
+Decision Tree             0.9962   1.0000  0.9981   0.9962   1.0000       0             3         7,830
+Random Forest             0.9987   1.0000  0.9994   1.0000   1.0000       0             1         7,810
+SVM (linear)              0.0219   0.9987  0.0428   0.5724   0.9982       1         34858       396,759
+Gradient Boosting         1.0000   1.0000  1.0000   1.0000   1.0000       0             0         7,800
 
 Test set
-Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts
------------------------------------------------------------------------------------------
-Logistic Regression       0.9389   0.4960  0.6491   0.8014   0.9952    2139           137
-Decision Tree             0.9998   1.0000  0.9999   0.9998   1.0000       0             1
-Random Forest             1.0000   0.9929  0.9965   1.0000   1.0000      30             0
-SVM (linear)              0.9436   0.4609  0.6193   0.7718   0.9947    2288           117
-Gradient Boosting         1.0000   0.9955  0.9978   1.0000   1.0000      19             0
+Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts    Total cost
+-------------------------------------------------------------------------------------------------------
+Logistic Regression       0.1248   0.9875  0.2216   0.8014   0.9952      53         29392    74,687,446
+Decision Tree             0.9998   1.0000  0.9999   0.9998   1.0000       0             1        42,450
+Random Forest             1.0000   0.9929  0.9965   1.0000   1.0000      30             0    71,271,588
+SVM (linear)              0.1023   0.9885  0.1854   0.7718   0.9947      49         36813    74,730,468
+Gradient Boosting         1.0000   0.9955  0.9978   1.0000   1.0000      19             0    43,526,258
 
 Best model: Random Forest (threshold 0.93039)
+
+Threshold choice for Random Forest on the test set (each alert costs 10 to review):
+  lowest cost (saved)  threshold 0.9304: 4,214 fraud caught, 30 missed, 0 false alerts; fraud missed 71,229,448 + reviews 42,140 = total cost 71,271,588
+  best F1              threshold 0.9304: 4,214 fraud caught, 30 missed, 0 false alerts; fraud missed 71,229,448 + reviews 42,140 = total cost 71,271,588

@@ -2,21 +2,25 @@ Dataset: Sparkov card payments
 Split: by time (train on earliest, test on latest)
 
 Validation set
-Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts
------------------------------------------------------------------------------------------
-Logistic Regression       0.3747   0.5951  0.4599   0.2618   0.9704     803          1969
-Decision Tree             0.5085   0.6929  0.5866   0.4510   0.9878     609          1328
-Random Forest             0.8333   0.7816  0.8067   0.8635   0.9963     433           310
-SVM (linear)              0.4639   0.6425  0.5388   0.2919   0.9520     709          1472
-Gradient Boosting         0.8943   0.8018  0.8455   0.9107   0.9984     393           188
+Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts    Total cost
+-------------------------------------------------------------------------------------------------------
+Logistic Regression       0.2733   0.6924  0.3919   0.2618   0.9704     610          3650       115,907
+Decision Tree             0.4234   0.7796  0.5488   0.4510   0.9878     437          2105        60,698
+Random Forest             0.4981   0.9143  0.6449   0.8635   0.9963     170          1827        58,625
+SVM (linear)              0.2419   0.6808  0.3570   0.2919   0.9520     633          4230       144,351
+Gradient Boosting         0.5039   0.9360  0.6551   0.9107   0.9984     127          1827        52,691
 
 Test set
-Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts
------------------------------------------------------------------------------------------
-Logistic Regression       0.2749   0.5883  0.3747   0.1806   0.9633     883          3329
-Decision Tree             0.3880   0.6793  0.4939   0.3496   0.9870     688          2298
-Random Forest             0.7666   0.7487  0.7575   0.8051   0.9944     539           489
-SVM (linear)              0.3481   0.6266  0.4476   0.2065   0.9448     801          2517
-Gradient Boosting         0.8553   0.7716  0.8113   0.8689   0.9977     490           280
+Model                  Precision   Recall      F1   PR-AUC  ROC-AUC  Missed  False alerts    Total cost
+-------------------------------------------------------------------------------------------------------
+Logistic Regression       0.1908   0.6774  0.2977   0.1806   0.9633     692          6162       141,915
+Decision Tree             0.3202   0.7725  0.4527   0.3496   0.9870     488          3518        75,760
+Random Forest             0.3863   0.8811  0.5372   0.8051   0.9944     255          3002        78,207
+SVM (linear)              0.1646   0.6695  0.2642   0.2065   0.9448     709          7289       175,275
+Gradient Boosting         0.3875   0.9245  0.5461   0.8689   0.9977     162          3134        69,852
 
-Best model: Gradient Boosting (threshold 0.926407)
+Best model: Gradient Boosting (threshold 0.472976)
+
+Threshold choice for Gradient Boosting on the test set (each alert costs 10 to review):
+  lowest cost (saved)  threshold 0.4730: 1,983 fraud caught, 162 missed, 3,134 false alerts; fraud missed 18,682 + reviews 51,170 = total cost 69,852
+  best F1              threshold 0.9264: 1,655 fraud caught, 490 missed, 280 false alerts; fraud missed 90,187 + reviews 19,350 = total cost 109,537

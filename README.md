@@ -85,45 +85,47 @@ Fraud is under 1% of every dataset, so a model that calls everything legitimate 
 
 These are test-set results from `ml/artifacts/<format>/comparison.txt`. The saved model for each format is in bold.
 
-The models are tested on the latest transactions, after the ones they learned from.
+The models are tested on the latest transactions, after the ones they learned from. Each threshold is the one that cost least on the validation set, with each alert costing 10 to review and each missed fraud costing its amount. Total cost is that sum on the test set.
 
 ### Credit card (56,746 test transactions, 74 fraud)
 
-| Model | Precision | Recall | F1 | PR-AUC | ROC-AUC | Missed fraud | False alerts |
-|---|---|---|---|---|---|---|---|
-| Logistic Regression | 0.942 | 0.662 | 0.778 | 0.751 | 0.981 | 25 | 3 |
-| Decision Tree | 0.654 | 0.716 | 0.684 | 0.479 | 0.832 | 21 | 28 |
-| Random Forest | 0.915 | 0.730 | 0.812 | 0.805 | 0.964 | 20 | 5 |
-| SVM (linear) | 0.686 | 0.649 | 0.667 | 0.649 | 0.980 | 26 | 22 |
-| **Gradient Boosting** | 0.867 | 0.703 | 0.776 | **0.785** | 0.968 | 22 | 8 |
+| Model | Precision | Recall | F1 | PR-AUC | ROC-AUC | Missed fraud | False alerts | Total cost |
+|---|---|---|---|---|---|---|---|---|
+| Logistic Regression | 0.942 | 0.662 | 0.778 | 0.751 | 0.981 | 25 | 3 | €3,857 |
+| Decision Tree | 0.654 | 0.716 | 0.684 | 0.479 | 0.832 | 21 | 28 | €4,697 |
+| Random Forest | 0.915 | 0.730 | 0.812 | 0.805 | 0.964 | 20 | 5 | €3,238 |
+| SVM (linear) | 0.587 | 0.730 | 0.651 | 0.649 | 0.980 | 20 | 38 | €3,921 |
+| **Gradient Boosting** | 0.893 | 0.676 | 0.769 | **0.785** | 0.968 | 24 | 6 | €4,530 |
 
 Gradient Boosting had the best validation score, so it is the saved model, even though Random Forest did slightly better on the test set. Picking by the test set would make the test result meaningless.
+
+Here the cost rule does a little worse than the best-F1 threshold: €4,530 against €4,276, because it misses two more frauds. The validation period holds only 57 frauds, too few to set a cost-based threshold reliably. The larger datasets below show the rule working.
 
 With the earlier random split, the same model scored PR-AUC 0.858 and caught 74 of 95 test frauds. That split mixed both days of the dataset into training and testing, so the model was partly tested on the same day it learned from. The time split is the honest figure.
 
 ### Sparkov (555,719 test transactions, 2,145 fraud)
 
-| Model | Precision | Recall | F1 | PR-AUC | ROC-AUC | Missed fraud | False alerts |
-|---|---|---|---|---|---|---|---|
-| Logistic Regression | 0.275 | 0.588 | 0.375 | 0.181 | 0.963 | 883 | 3,329 |
-| Decision Tree | 0.388 | 0.679 | 0.494 | 0.350 | 0.987 | 688 | 2,298 |
-| Random Forest | 0.767 | 0.749 | 0.757 | 0.805 | 0.994 | 539 | 489 |
-| SVM (linear) | 0.348 | 0.627 | 0.448 | 0.206 | 0.945 | 801 | 2,517 |
-| **Gradient Boosting** | 0.855 | 0.772 | 0.811 | **0.869** | 0.998 | 490 | 280 |
+| Model | Precision | Recall | F1 | PR-AUC | ROC-AUC | Missed fraud | False alerts | Total cost |
+|---|---|---|---|---|---|---|---|---|
+| Logistic Regression | 0.191 | 0.677 | 0.298 | 0.181 | 0.963 | 692 | 6,162 | $141,915 |
+| Decision Tree | 0.320 | 0.772 | 0.453 | 0.350 | 0.987 | 488 | 3,518 | $75,760 |
+| Random Forest | 0.386 | 0.881 | 0.537 | 0.805 | 0.994 | 255 | 3,002 | $78,207 |
+| SVM (linear) | 0.165 | 0.669 | 0.264 | 0.206 | 0.945 | 709 | 7,289 | $175,275 |
+| **Gradient Boosting** | 0.388 | 0.924 | 0.546 | **0.869** | 0.998 | 162 | 3,134 | $69,852 |
 
-The test file always covered the six months after the training file, so this result barely changed. Choosing the threshold on the latest part of the training file now catches 10 more frauds with 13 fewer false alerts. Linear models do badly here because fraud depends on combinations, such as a large online purchase late at night, that a single straight line cannot separate.
+The cost rule pays off here. It sets the threshold at 0.473 instead of 0.926, so the model raises more alerts: it catches 1,983 of 2,145 frauds instead of 1,655, at the price of 3,134 false alerts instead of 280. Missed fraud falls from $90,187 to $18,682, and the total cost, reviews included, falls from $109,537 to $69,852, 36% less. Because most fraud here is worth hundreds of dollars, a $10 review is worth doing on fairly weak suspicion. `comparison.txt` shows both thresholds side by side. Linear models do badly here because fraud depends on combinations, such as a large online purchase late at night, that a single straight line cannot separate.
 
 ### PaySim (1,293,438 test transactions, 4,244 fraud)
 
-| Model | Precision | Recall | F1 | PR-AUC | ROC-AUC | Missed fraud | False alerts |
-|---|---|---|---|---|---|---|---|
-| Logistic Regression | 0.939 | 0.496 | 0.649 | 0.801 | 0.995 | 2,139 | 137 |
-| Decision Tree | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0 | 1 |
-| **Random Forest** | 1.000 | 0.993 | 0.997 | **1.000** | 1.000 | 30 | 0 |
-| SVM (linear) | 0.944 | 0.461 | 0.619 | 0.772 | 0.995 | 2,288 | 117 |
-| Gradient Boosting | 1.000 | 0.996 | 0.998 | 1.000 | 1.000 | 19 | 0 |
+| Model | Precision | Recall | F1 | PR-AUC | ROC-AUC | Missed fraud | False alerts | Total cost |
+|---|---|---|---|---|---|---|---|---|
+| Logistic Regression | 0.125 | 0.988 | 0.222 | 0.801 | 0.995 | 53 | 29,392 | 74,687,446 |
+| Decision Tree | 1.000 | 1.000 | 1.000 | 1.000 | 1.000 | 0 | 1 | 42,450 |
+| **Random Forest** | 1.000 | 0.993 | 0.997 | **1.000** | 1.000 | 30 | 0 | 71,271,588 |
+| SVM (linear) | 0.102 | 0.989 | 0.185 | 0.772 | 0.995 | 49 | 36,813 | 74,730,468 |
+| Gradient Boosting | 1.000 | 0.996 | 0.998 | 1.000 | 1.000 | 19 | 0 | 43,526,258 |
 
-The near-perfect score is a quirk of the simulator, not proof of a perfect model. In PaySim, fraudulent transfers almost always empty the account and leave balances that do not add up, which real bank data would not give away so easily. The score stays near-perfect under the time split, which confirms that the simulator, not mixed-up days, is the reason. The last week of the simulation holds far more fraud than the rest (4,244 of 1.29 million test rows, against 3,173 of 3.79 million training rows).
+The near-perfect score is a quirk of the simulator, not proof of a perfect model. In PaySim, fraudulent transfers almost always empty the account and leave balances that do not add up, which real bank data would not give away so easily. The score stays near-perfect under the time split, which confirms that the simulator, not mixed-up days, is the reason. The cost rule and the best-F1 rule pick the same threshold here. The 30 missed frauds still cost 71 million units, because PaySim fraud empties whole accounts. The last week of the simulation holds far more fraud than the rest (4,244 of 1.29 million test rows, against 3,173 of 3.79 million training rows).
 
 ![Precision-recall curves for credit card](ml/artifacts/creditcard/pr_curves.png)
 

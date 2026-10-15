@@ -2,7 +2,7 @@
   "dataset": "sparkov",
   "dataset_title": "Sparkov card payments",
   "model_name": "Gradient Boosting",
-  "threshold": 0.926407,
+  "threshold": 0.472976,
   "score_type": "probability",
   "features": [
     "amount",
@@ -29,19 +29,22 @@
     "cat_travel"
   ],
   "smote": true,
-  "trained_at": "2026-10-15T14:38:21+00:00",
+  "trained_at": "2026-10-15T14:54:11+00:00",
   "split": "time",
   "rows": {
     "train": 972506,
     "validation": 324169,
     "test": 555719
   },
-  "selection": "highest validation PR-AUC; threshold maximises validation F1",
+  "threshold_rule": "cost",
+  "review_cost": 10.0,
+  "selection": "highest validation PR-AUC; threshold costs least on validation (missed fraud amount + review cost per alert)",
   "test_metrics": {
-    "precision": 0.8553,
-    "recall": 0.7716,
-    "f1": 0.8113,
-    "pr_auc": 0.8689
+    "precision": 0.3875,
+    "recall": 0.9245,
+    "f1": 0.5461,
+    "pr_auc": 0.8689,
+    "total_cost": 69851.82
   },
   "baseline": {
     "amount": 47.19,
