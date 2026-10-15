@@ -1,145 +1,146 @@
 {
+  "split": "time",
   "validation": {
     "Logistic Regression": {
-      "threshold": 1.0,
-      "precision": 0.8734,
-      "recall": 0.734,
-      "f1": 0.7977,
-      "pr_auc": 0.69,
-      "roc_auc": 0.9722,
+      "threshold": 0.999998,
+      "precision": 0.9756,
+      "recall": 0.7018,
+      "f1": 0.8163,
+      "pr_auc": 0.7736,
+      "roc_auc": 0.9653,
       "confusion_matrix": {
-        "tn": 56641,
-        "fp": 10,
-        "fn": 25,
-        "tp": 69
+        "tn": 56687,
+        "fp": 1,
+        "fn": 17,
+        "tp": 40
       }
     },
     "Decision Tree": {
-      "threshold": 0.999264,
-      "precision": 0.6087,
-      "recall": 0.7447,
-      "f1": 0.6699,
-      "pr_auc": 0.4654,
-      "roc_auc": 0.8859,
+      "threshold": 0.99909,
+      "precision": 0.5909,
+      "recall": 0.6842,
+      "f1": 0.6341,
+      "pr_auc": 0.42,
+      "roc_auc": 0.8379,
       "confusion_matrix": {
-        "tn": 56606,
-        "fp": 45,
-        "fn": 24,
-        "tp": 70
+        "tn": 56661,
+        "fp": 27,
+        "fn": 18,
+        "tp": 39
       }
     },
     "Random Forest": {
-      "threshold": 0.815372,
-      "precision": 0.9067,
-      "recall": 0.7234,
-      "f1": 0.8047,
-      "pr_auc": 0.7795,
-      "roc_auc": 0.966,
+      "threshold": 0.527018,
+      "precision": 0.9556,
+      "recall": 0.7544,
+      "f1": 0.8431,
+      "pr_auc": 0.7473,
+      "roc_auc": 0.9556,
       "confusion_matrix": {
-        "tn": 56644,
-        "fp": 7,
-        "fn": 26,
-        "tp": 68
+        "tn": 56686,
+        "fp": 2,
+        "fn": 14,
+        "tp": 43
       }
     },
     "SVM (linear)": {
-      "threshold": 1.91063,
-      "precision": 0.7634,
-      "recall": 0.7553,
-      "f1": 0.7594,
-      "pr_auc": 0.637,
-      "roc_auc": 0.9716,
+      "threshold": 1.751349,
+      "precision": 0.6032,
+      "recall": 0.6667,
+      "f1": 0.6333,
+      "pr_auc": 0.5723,
+      "roc_auc": 0.9664,
       "confusion_matrix": {
-        "tn": 56629,
-        "fp": 22,
-        "fn": 23,
-        "tp": 71
+        "tn": 56663,
+        "fp": 25,
+        "fn": 19,
+        "tp": 38
       }
     },
     "Gradient Boosting": {
-      "threshold": 0.934821,
-      "precision": 0.9211,
-      "recall": 0.7447,
-      "f1": 0.8235,
-      "pr_auc": 0.794,
-      "roc_auc": 0.9655,
+      "threshold": 0.513582,
+      "precision": 0.9556,
+      "recall": 0.7544,
+      "f1": 0.8431,
+      "pr_auc": 0.7918,
+      "roc_auc": 0.9647,
       "confusion_matrix": {
-        "tn": 56645,
-        "fp": 6,
-        "fn": 24,
-        "tp": 70
+        "tn": 56686,
+        "fp": 2,
+        "fn": 14,
+        "tp": 43
       }
     }
   },
   "test": {
     "Logistic Regression": {
-      "threshold": 1.0,
-      "precision": 0.8875,
-      "recall": 0.7474,
-      "f1": 0.8114,
-      "pr_auc": 0.7342,
-      "roc_auc": 0.968,
+      "threshold": 0.999998,
+      "precision": 0.9423,
+      "recall": 0.6622,
+      "f1": 0.7778,
+      "pr_auc": 0.7513,
+      "roc_auc": 0.9807,
       "confusion_matrix": {
-        "tn": 56642,
-        "fp": 9,
-        "fn": 24,
-        "tp": 71
+        "tn": 56669,
+        "fp": 3,
+        "fn": 25,
+        "tp": 49
       }
     },
     "Decision Tree": {
-      "threshold": 0.999264,
-      "precision": 0.6017,
-      "recall": 0.7474,
-      "f1": 0.6667,
-      "pr_auc": 0.4757,
-      "roc_auc": 0.9272,
+      "threshold": 0.99909,
+      "precision": 0.6543,
+      "recall": 0.7162,
+      "f1": 0.6839,
+      "pr_auc": 0.4786,
+      "roc_auc": 0.8321,
       "confusion_matrix": {
-        "tn": 56604,
-        "fp": 47,
-        "fn": 24,
-        "tp": 71
+        "tn": 56644,
+        "fp": 28,
+        "fn": 21,
+        "tp": 53
       }
     },
     "Random Forest": {
-      "threshold": 0.815372,
-      "precision": 0.8846,
-      "recall": 0.7263,
-      "f1": 0.7977,
-      "pr_auc": 0.7875,
-      "roc_auc": 0.9866,
+      "threshold": 0.527018,
+      "precision": 0.9153,
+      "recall": 0.7297,
+      "f1": 0.812,
+      "pr_auc": 0.805,
+      "roc_auc": 0.964,
       "confusion_matrix": {
-        "tn": 56642,
-        "fp": 9,
-        "fn": 26,
-        "tp": 69
+        "tn": 56667,
+        "fp": 5,
+        "fn": 20,
+        "tp": 54
       }
     },
     "SVM (linear)": {
-      "threshold": 1.91063,
-      "precision": 0.7553,
-      "recall": 0.7474,
-      "f1": 0.7513,
-      "pr_auc": 0.7069,
-      "roc_auc": 0.9704,
+      "threshold": 1.751349,
+      "precision": 0.6857,
+      "recall": 0.6486,
+      "f1": 0.6667,
+      "pr_auc": 0.6488,
+      "roc_auc": 0.9798,
       "confusion_matrix": {
-        "tn": 56628,
-        "fp": 23,
-        "fn": 24,
-        "tp": 71
+        "tn": 56650,
+        "fp": 22,
+        "fn": 26,
+        "tp": 48
       }
     },
     "Gradient Boosting": {
-      "threshold": 0.934821,
-      "precision": 0.925,
-      "recall": 0.7789,
-      "f1": 0.8457,
-      "pr_auc": 0.8579,
-      "roc_auc": 0.9779,
+      "threshold": 0.513582,
+      "precision": 0.8667,
+      "recall": 0.7027,
+      "f1": 0.7761,
+      "pr_auc": 0.7849,
+      "roc_auc": 0.9676,
       "confusion_matrix": {
-        "tn": 56645,
-        "fp": 6,
-        "fn": 21,
-        "tp": 74
+        "tn": 56664,
+        "fp": 8,
+        "fn": 22,
+        "tp": 52
       }
     }
   },

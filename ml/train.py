@@ -6,11 +6,16 @@ Usage:
     python -m ml.train --dataset sparkov --data data/raw/fraudTrain.csv --test-data data/raw/fraudTest.csv
     python -m ml.train --dataset paysim --data data/raw/paysim.csv --max-train-rows 1000000
     python -m ml.train --no-smote                         # use class weights instead of SMOTE
+    python -m ml.train --random-split                     # old random split, for comparison
 
 Each dataset format (see ml/datasets.py) gets its own model, saved under
 ml/artifacts/<dataset>/. Each model is a pipeline of StandardScaler ->
 SMOTE -> classifier. SMOTE inside an imblearn pipeline runs only while
 fitting, so the validation and test sets are never resampled.
+
+Transactions are split by time (see ml/preprocess.py): train on the
+earliest, pick the model and threshold on the next period, and test on the
+latest, the way a deployed model meets new data.
 
 The best model is chosen by PR-AUC on the validation set, and its alert
 threshold is the one that maximises F1 on the validation set. The test set
@@ -105,7 +110,7 @@ def limit_training_rows(X, y, max_rows, random_state=RANDOM_STATE):
 
 
 def train(data_path=DEFAULT_DATA_PATH, use_smote=True, out_dir=None, dataset=DEFAULT_PROFILE,
-          test_path=None, max_train_rows=None):
+          test_path=None, max_train_rows=None, by_time=True):
     profile = get_profile(dataset)
     out_dir = Path(out_dir or ARTIFACTS_DIR / dataset)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -113,10 +118,10 @@ def train(data_path=DEFAULT_DATA_PATH, use_smote=True, out_dir=None, dataset=DEF
     df = load_data(data_path, dataset)
     if test_path:
         X_train, X_val, X_test, y_train, y_val, y_test = split_with_test_file(
-            df, load_data(test_path, dataset), dataset, RANDOM_STATE
+            df, load_data(test_path, dataset), dataset, RANDOM_STATE, by_time
         )
     else:
-        X_train, X_val, X_test, y_train, y_val, y_test = split_data(df, dataset, RANDOM_STATE)
+        X_train, X_val, X_test, y_train, y_val, y_test = split_data(df, dataset, RANDOM_STATE, by_time)
     del df
     print(f"Train {len(X_train):,} / validation {len(X_val):,} / test {len(X_test):,} rows")
     rows = {"train": len(X_train), "validation": len(X_val), "test": len(X_test)}
@@ -155,6 +160,7 @@ def train(data_path=DEFAULT_DATA_PATH, use_smote=True, out_dir=None, dataset=DEF
         "features": profile.feature_names,
         "smote": use_smote,
         "trained_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "split": "time" if by_time else "random",
         "rows": rows | ({"train_used": len(X_train)} if len(X_train) < rows["train"] else {}),
         "selection": "highest validation PR-AUC; threshold maximises validation F1",
         "test_metrics": {k: best[k] for k in ("precision", "recall", "f1", "pr_auc")},
@@ -163,10 +169,12 @@ def train(data_path=DEFAULT_DATA_PATH, use_smote=True, out_dir=None, dataset=DEF
     }
     (out_dir / "model_meta.json").write_text(json.dumps(metadata, indent=2))
     (out_dir / "metrics.json").write_text(
-        json.dumps({"validation": val_results, "test": test_results, "best_model": best_name}, indent=2)
+        json.dumps({"split": metadata["split"], "validation": val_results, "test": test_results,
+                    "best_model": best_name}, indent=2)
     )
     report = (
-        f"Dataset: {profile.title}\n\n"
+        f"Dataset: {profile.title}\n"
+        f"Split: {'by time (train on earliest, test on latest)' if by_time else 'random'}\n\n"
         "Validation set\n" + format_table(val_results)
         + "\n\nTest set\n" + format_table(test_results)
         + f"\n\nBest model: {best_name} (threshold {best['threshold']})\n"
@@ -188,10 +196,12 @@ def main():
     parser.add_argument("--max-train-rows", type=int,
                         help="Keep all fraud rows but sample genuine ones so training uses at most this many rows")
     parser.add_argument("--no-smote", action="store_true", help="Use class weights instead of SMOTE")
+    parser.add_argument("--random-split", action="store_true",
+                        help="Shuffle rows into the sets instead of splitting by time (overstates accuracy)")
     parser.add_argument("--out", help="Folder for the model and reports (default: ml/artifacts/<dataset>)")
     args = parser.parse_args()
     train(args.data, use_smote=not args.no_smote, out_dir=args.out, dataset=args.dataset,
-          test_path=args.test_data, max_train_rows=args.max_train_rows)
+          test_path=args.test_data, max_train_rows=args.max_train_rows, by_time=not args.random_split)
 
 
 if __name__ == "__main__":
