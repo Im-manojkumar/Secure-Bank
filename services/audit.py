@@ -24,6 +24,8 @@ ACTIONS = (
     "report_deleted",
     "report_exported",
     "model_retrained",
+    "api_key_created",
+    "api_key_revoked",
 )
 
 # Failed logins allowed per email and IP address within the window before blocking.

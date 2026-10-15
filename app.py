@@ -61,9 +61,9 @@ def create_app(config_class=Config):
         use_sqlite_wal(db.engine)
     login_manager.init_app(app)
 
-    from routes import alerts, audit as audit_routes, auth, dashboard, pages, reports, transactions
+    from routes import alerts, audit as audit_routes, auth, dashboard, live, pages, reports, transactions
 
-    for module in (auth, transactions, alerts, dashboard, reports, audit_routes, pages):
+    for module in (auth, transactions, alerts, dashboard, reports, audit_routes, live, pages):
         app.register_blueprint(module.bp)
 
     register_error_handlers(app)
@@ -193,6 +193,31 @@ def register_commands(app):
         audit.record("user_created", subject=email, details={"role": role, "via": "cli"})
         db.session.commit()
         click.echo(f"Created {role} {email}")
+
+    @app.cli.command("create-api-key")
+    @click.argument("name")
+    def create_api_key(name):
+        """Make a key another system uses to call POST /api/v1/score."""
+        from services.live import create_key
+
+        row, key = create_key(name.strip()[:120])
+        audit.record("api_key_created", subject=f"api_key:{row.id}", details={"name": row.name, "prefix": row.prefix})
+        db.session.commit()
+        click.echo(f"API key for {row.name} (shown only once, store it safely):\n{key}")
+
+    @app.cli.command("revoke-api-key")
+    @click.argument("prefix")
+    def revoke_api_key(prefix):
+        """Stop a key from working, by the first characters shown when it was made."""
+        from models import ApiKey, utcnow
+
+        keys = ApiKey.query.filter(ApiKey.prefix == prefix[:12], ApiKey.revoked_at.is_(None)).all()
+        if len(keys) != 1:
+            raise click.ClickException(f"No single active key starts with {prefix[:12]}")
+        keys[0].revoked_at = utcnow()
+        audit.record("api_key_revoked", subject=f"api_key:{keys[0].id}", details={"name": keys[0].name})
+        db.session.commit()
+        click.echo(f"Revoked the key for {keys[0].name}")
 
     @app.cli.command("retrain")
     @click.option("--dataset", required=True, help="Format to retrain: creditcard, sparkov or paysim")

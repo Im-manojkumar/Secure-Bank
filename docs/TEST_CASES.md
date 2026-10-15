@@ -126,6 +126,18 @@ All of these run automatically with `pytest`, locally and on every push and pull
 | DR-02 | Fewer than 200 rows | Not judged | `test_drift_is_not_judged_on_a_handful_of_rows` |
 | DR-03 | Import a normal file, then a shifted one | First stable; second marked major in its message and on the dashboard, only for its own format | `test_drift_shows_on_the_import_and_the_dashboard` |
 
+## 7c. Live scoring API (`tests/test_live.py`)
+
+| ID | Case | Expected result | Test |
+|---|---|---|---|
+| LV-01 | No key, a wrong key, a valid key, a revoked key | 401, 401, 200, 401 | `test_score_needs_a_valid_active_key` |
+| LV-02 | A risky Sparkov payment with a card number | Review or decline with reasons; saved under the key's source with a case; card number not stored | `test_live_score_decides_stores_and_opens_a_case` |
+| LV-03 | The same call sent twice | Second answer marked duplicate, same transaction, nothing saved twice | `test_a_retried_call_is_answered_without_storing_twice` |
+| LV-04 | Three payments on one card within minutes | All linked by card ID; a fourth sees three in the past hour | `test_payments_on_the_same_card_build_its_history` |
+| LV-05 | Score at or above `DECLINE_SCORE` | Declined | `test_very_high_scores_are_declined` |
+| LV-06 | Unknown format, negative amount, card number with dashes | 400 with the problems listed | `test_bad_requests_are_explained` |
+| LV-07 | `create-api-key`, then `revoke-api-key` | Key printed once, only its hash stored, revoked; both audited | `test_api_keys_are_made_and_revoked_from_the_command_line` |
+
 ## 8. Saved reports and CSV downloads (`tests/test_reports.py`)
 
 | ID | Case | Expected result | Test |

@@ -95,6 +95,7 @@ erDiagram
         json features
         int dataset_label
         string row_hash
+        string card_id
     }
     predictions {
         int id
@@ -118,6 +119,14 @@ erDiagram
         json filters
         int created_by
     }
+    api_keys {
+        int id
+        string name
+        string prefix
+        string key_hash
+        datetime last_used_at
+        datetime revoked_at
+    }
     audit_logs {
         int id
         int user_id
@@ -129,6 +138,8 @@ erDiagram
 ```
 
 The imported record, the model's prediction and the analyst's outcome sit in three separate tables. A reviewer marking a case "Legitimate" never changes what the model predicted, so the two can be compared later. `dataset_label` keeps the Kaggle `Class` value for evaluation only, and the app never uses it to make decisions.
+
+An API key is stored only as its SHA-256 hash and its first 12 characters, so a database leak does not reveal working keys. Transactions scored through the live API (`POST /api/v1/score`, `services/live.py`) are stored under one `data_sources` row per key and format, with `source_type` "api".
 
 A saved report stores only its name and the search filters, never a copy of the results. Opening it runs the search again (`services/search.py`), so its totals, case counts and CSV download always match the current data.
 

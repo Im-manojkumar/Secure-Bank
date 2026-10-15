@@ -222,7 +222,7 @@ The pages are plain HTML, CSS and JavaScript with no build step and no external 
 
 ### API
 
-Every endpoint except login needs a logged-in session cookie. Errors come back as `{"error": "..."}`.
+Every endpoint except login and the live scoring API needs a logged-in session cookie. Errors come back as `{"error": "..."}`.
 
 | Method and path | Who | What it does |
 |---|---|---|
@@ -248,6 +248,21 @@ Every endpoint except login needs a logged-in session cookie. Errors come back a
 | `GET /api/dashboard/summary` | logged in | Totals, predicted fraud, flagged amounts per currency, cases by status and a trend by day, or by hour with `?granularity=hour`; `?dataset=` limits it to one format |
 
 List endpoints take `page` and `per_page` (at most 100).
+
+### Live scoring API
+
+Imports score transactions after the fact. A payment system can instead ask before it approves a payment, with an API key rather than a login:
+
+```bash
+flask --app app create-api-key "Card switch"      # prints the key once
+curl -H "Authorization: Bearer sbk_..." -H "Content-Type: application/json" \
+  -d '{"dataset":"sparkov","card_number":"4111111111111111","transaction":{"trans_date_trans_time":"2020-07-01 23:30:00","category":"shopping_net","amt":950,"dob":"1970-05-01","city_pop":25000,"lat":40.0,"long":-100.0,"merch_lat":40.5,"merch_long":-100.5}}' \
+  http://127.0.0.1:5000/api/v1/score
+```
+
+The answer has a `decision`: **approve** below the model's alert threshold, **review** at or above it (approve, but open a case for an analyst), and **decline** at a risk score of `DECLINE_SCORE` (0.98) or more. It also has the risk score, the reasons, the model version and `latency_ms`. With the real Sparkov model the median is about 28 ms and the 95th percentile about 41 ms, including the card history lookup and saving, measured over 200 calls on the development machine.
+
+The transaction, prediction and any case are saved like an imported row, under a source named "Live API: <key name>", so they appear on the dashboard and in the alert queue. `card_number` is optional and only used by Sparkov, to compare the payment with the card's history; it is never stored. Sending the same transaction again (a retry) returns the first answer and saves nothing new. `flask --app app revoke-api-key <first 12 characters>` turns a key off. Only a SHA-256 hash of each key is stored.
 
 Example with curl:
 
@@ -284,12 +299,12 @@ Before running anywhere other than your own machine:
 pytest
 ```
 
-There are 134 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
+There are 141 tests, which run on GitHub for every push and pull request. They use generated data and an in-memory database, so they run without the real dataset. [docs/TEST_CASES.md](docs/TEST_CASES.md) lists every case with its expected result. They cover the model pipeline, every API endpoint (login, roles, import validation, duplicate detection, filters and the case workflow) every page (login redirects, admin-only pages and safe redirects after login), the audit log, the security protections, each dataset format with its explanations, and saved reports with their CSV downloads.
 
 ## Project layout
 
 ```
-app.py            Flask app factory and CLI commands (init-db, create-user, import-csv, retrain)
+app.py            Flask app factory and CLI commands (init-db, create-user, import-csv, retrain, create-api-key, revoke-api-key)
 config.py         settings, overridable with environment variables
 models.py         database tables
 routes/           API endpoints (auth, transactions, alerts, reports, dashboard, audit) and HTML pages (pages.py)
